@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Unlit_WindingGlyph
+  m_Shader: {fileID: 4800000, guid: 41872bf1cfb609742b1e1af9e91c7708, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _SCENE_ONE
+  m_InvalidKeywords:
+  - _SCENE_SCENE0
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AspectScale: 0
+    - _BorderRate: 0
+    - _CellSize: 1
+    - _Flip: -1
+    - _GridSize: 1
+    - _GridTileScale: 0
+    - _LetterScale: 1
+    - _LetterSeed: 1
+    - _LetterSegment: 1
+    - _LetterSpeed: 1
+    - _PaletteIndex: 1
+    - _RotateRate: 0
+    - _RotateScale: 0
+    - _Scene: 0
+    - _SceneIndex: 1
+    - _SlideSpeed: 0
+    - _Spacing: 0.4
+    - _SpacingSlideIn: 0
+    - _SubDivision: 1
+    - _WhiteGridRate: 0
+    - _WhiteGridSizeThreshold: 0.2
+    - _WhiteGridSizeThreshols: 0
+    - _Z2: 1
+    m_Colors:
+    - _BorderColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Size: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

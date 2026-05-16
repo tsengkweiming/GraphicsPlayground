@@ -1,0 +1,345 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel InitPoints
+#pragma kernel BuildLine
+#pragma kernel CSMain
+
+struct LineSegment {
+    float2 p0;
+    float2 p1;
+    float3 emissiveColor;
+};
+
+#include "../../Common/Matrix.hlsl"
+#include "../../Common/Random.cginc"
+
+#ifndef PI
+#define PI 3.14159265359
+#endif
+
+float4 _Resoultion;
+RWTexture2D<float4> _Result : register(u0);
+RWStructuredBuffer<float2> _PointDataBuffer : register(u1);
+RWStructuredBuffer<float> _AngleData : register(u2);
+RWStructuredBuffer<LineSegment> _LineSegmentBuffer;
+RWStructuredBuffer<uint> _AngleBuffer;
+
+int _NumPoints;
+int N;
+
+float mod(float x, float y)
+{
+    return x - y * floor(x / y);
+}
+
+// const float gridSize = 0.3;
+float2 gridPoint(uint id, uint n)
+{
+    float i = float(id % 3u);
+    float j = float(id / 3u);
+    float2 gId = float2(i,j);
+    float2 gId1 = float2(i+1.2,j-0.9);
+    float2 gId2 = float2(i-0.5,j+0.3);
+    float rnd0 = nrand(gId)* nrand(gId);
+    float rnd1 = nrand(gId1)* nrand(gId1);
+    float rnd2 = nrand(gId2)* nrand(gId2);
+    const float gridSize = 0.3;
+
+    return
+    n == 0 ? float2(gridSize*(i+lerp(rnd0,0.,.25)), gridSize*(j+1.)) : 
+    n == 1 ? float2(gridSize*(i+lerp(rnd0,1.,.75)), gridSize*(j+1.)) : 
+    n == 2 ? float2(gridSize*(i+1.), gridSize*(j+lerp(rnd1,1.,.75))) : 
+    n == 3 ? float2(gridSize*(i+1.), gridSize*(j+lerp(rnd2,0.,.25))) : float2(0,0);
+}
+
+float angles[40];
+// void sortAngles(float2 fragCoord)
+// {
+//     // angles[0] = 1;
+//     [unroll]
+//     for (int i = 0; i < 20; ++i)
+//     {
+//         for (int j = 0; j < 2; ++j)
+//         {
+//             int k = 2 * i + j;
+//             float2 p = j == 0 ? _LineSegmentBuffer[i].p0 - fragCoord : _LineSegmentBuffer[i].p1 - fragCoord;
+//             float angle = mod(atan2(p.y, p.x), 2.0 * PI);
+//     
+//             int l = k - 1;
+//             
+//             // while (l >= 0 && angle < angles[l])
+//             // {
+//             //     angles[l + 1] = angles[l];
+//             //     l--;
+//             // }
+//             // angles[l + 1] = angle;
+//             
+//             for (int t = l; t >= 0; --t)
+//             {
+//                 if (angle >= angles[t])
+//                 {
+//                     angles[t + 1] = angle;
+//                     break;
+//                 }
+//
+//                 angles[t + 1] = angles[t];
+//
+//                 if (t == 0)
+//                 {
+//                     angles[0] = angle;
+//                     break;
+//                 }
+//             }
+//         }
+//     }
+// }
+void sortAngles(float2 fragCoord)
+{
+    // 先初始化，避免殘值
+    // [unroll] for (int i=0;i<40;++i) angles[i] = 1e20;
+
+    [unroll]
+    for (int i = 0; i < 20; ++i)
+    {
+        for (int j = 0; j < 2; ++j)
+        {
+            int k = 2 * i + j;
+
+            float2 p = (j==0 ? _LineSegmentBuffer[i].p0 : _LineSegmentBuffer[i].p1) - fragCoord;
+            float angle = atan2(p.y, p.x);
+            if (angle < 0) angle += 2.0 * PI;
+
+            int l = k - 1;
+
+            bool inserted = false;
+            for (int t = l; t >= 0; --t)
+            {
+                if (angle >= angles[t])
+                {
+                    angles[t + 1] = angle;
+                    inserted = true;
+                    break;
+                }
+
+                angles[t + 1] = angles[t];
+
+                if (t == 0)
+                {
+                    angles[0] = angle;
+                    inserted = true;
+                    break;
+                }
+            }
+
+            // ✅ 這一行就是你少的 GLSL 行為：k==0 時會走到這裡
+            if (!inserted)
+                angles[0] = angle;
+        }
+    }
+}
+
+// groupshared float angles[256];
+// void sortAngles(float2 fragCoord)
+// {
+//     [loop]
+//     for (int t = 0; t < 2 * N; ++t)
+//         angles[t] = 1e20;
+//
+//     [loop]
+//     for (int i = 0; i < N; ++i)
+//     {
+//         [loop]
+//         for (int j = 0; j < 2; ++j)
+//         {
+//             int k = 2 * i + j;
+//
+//             float2 p = (j == 0)
+//                 ? (_LineSegmentBuffer[i].p0 - fragCoord)
+//                 : (_LineSegmentBuffer[i].p1 - fragCoord);
+//
+//             // float angle = atan2(p.y, p.x);
+//             // if (angle < 0) angle += 2.0 * PI;
+//             float angle = mod(atan2(p.y, p.x), 2.0 * PI);
+//
+//             int l = k - 1;
+//
+//             [loop]
+//             while (l >= 0 && angle < angles[l])
+//             {
+//                 angles[l + 1] = angles[l];
+//                 l--;
+//             }
+//
+//             angles[l + 1] = angle;
+//         }
+//     }
+// }
+
+float3 integrateRadiance(LineSegment a, float2 angle) {
+    return (angle[1] - angle[0]) * a.emissiveColor;
+}
+
+float3 skyRadiance(float2 angle) {
+    float a1 = angle[1];
+    float a0 = angle[0];
+    
+    // https://www.shadertoy.com/view/NttSW7
+    const float3 SkyColor = float3(0.2,0.23,.85);
+    const float3 SunColor = float3(1.,0.7,0.1)*10.;
+    const float SunA = 2.0;
+    const float SunS = 64.0;
+    const float SSunS = sqrt(SunS);
+    const float ISSunS = 1./SSunS;
+    float3 SI = SkyColor*(a1-a0-0.5*(cos(a1)-cos(a0)));
+    SI += SunColor*(atan(SSunS*(SunA-a0))-atan(SSunS*(SunA-a1)))*ISSunS;
+    return SI / 6.0;
+}
+
+float3 integrateSkyRadiance(float2 angle) {
+    if (angle[1] < 2.0 * PI) {
+        return skyRadiance(angle);
+    }
+    return skyRadiance(float2(angle[0], 2.0 * PI)) + skyRadiance(float2(0.0, angle[1] - 2.0 * PI));
+}
+
+int findIndex(float angle, float2 fragCoord) {
+    float2x2 m;
+    float2 col1 = float2(cos(angle), sin(angle));
+    int bestIndex = -1;
+    float bestU = 1e10;
+    
+    for (int i = 0; i < N; ++i) {
+        float2 col0 = _LineSegmentBuffer[i].p0 - _LineSegmentBuffer[i].p1;
+        m[0] = float2(col0.x, col1.x); // row-major row1
+        m[1] = float2(col0.y, col1.y);
+        float2 tu = mul(inverse(m), _LineSegmentBuffer[i].p0 - fragCoord);
+        float2 result = clamp(tu, float2(0,0), float2(1.0, bestU));
+        if (all(tu == result))
+        {
+            bestU = tu.y;
+            bestIndex = i;
+        }
+    }
+    
+    return bestIndex;
+}
+
+float3 calculateFluence(float2 fragCoord) {
+    float3 fluence = 0.0;
+    
+    for (int i = 0; i < 2 * N; ++i) {
+        float2 a;
+        a[0] = angles[i];
+        
+        if (i + 1 < 2 * N) {
+            a[1] = angles[i + 1];
+        } else {
+            a[1] = angles[0] + 2.0 * PI;
+        }
+        
+        if (a[0] == a[1]) {
+            continue;
+        }
+        
+        int j = findIndex((a[0] + a[1]) / 2.0, fragCoord);
+        
+        if (j == -1) {
+            fluence += integrateSkyRadiance(a);
+        } else {
+            fluence += integrateRadiance(_LineSegmentBuffer[j], a);
+        }
+    }
+    
+    return fluence;
+}
+
+float sdf(LineSegment l, float2 p, float2 fragCoord) {
+    float2 pa = p-l.p0 + fragCoord, ba = l.p1-l.p0;
+    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+    return length( pa - ba*h );
+}
+
+float4 blendOver(float4 top, float4 bottom) {
+    float a = top.a + bottom.a * (1.0 - top.a);
+    return float4((top.rgb * top.a + bottom.rgb * bottom.a * (1.0 - top.a)) / a , a);
+}
+
+void drawSDF(inout float4 dst, float4 src, float sdf) {
+    dst = blendOver(float4(src.rgb, src.a * clamp(1.5 - abs(sdf), 0.0, 1.0)), dst);
+}
+
+float3 palette(in float t)
+{
+    float3 a = float3(0.5, 0.5, 0.5);
+    float3 b = float3(0.1184, 0.334, 0.205);
+    float3 c = float3(1.288, 0.948, 1.038);
+    float3 d = float3(-0.113, 0.687, 1.027);
+    return a + b * cos(6.28318 * (c * t + d));
+}
+
+[numthreads(8,1,1)]
+void InitPoints (uint3 id : SV_DispatchThreadID)
+{
+    uint pId = id.x;
+    float2 offset = float2(0.05, 0.05) * _Resoultion.xy;
+    float2 pointData = offset + gridPoint(pId / 4u, pId % 4u) * _Resoultion.xy;
+    _PointDataBuffer[pId] = pointData;
+}
+
+[numthreads(8,1,1)]
+void BuildLine (uint3 id : SV_DispatchThreadID)
+{
+    uint lId = id.x;
+    _LineSegmentBuffer[lId].p0 = _PointDataBuffer[lId*2+0];
+    _LineSegmentBuffer[lId].p1 = _PointDataBuffer[lId*2+1];
+
+    if (lId == 7)
+        _LineSegmentBuffer[lId].emissiveColor = float3(0.5, 0.5, 0.5);
+    else if (lId == 14)
+        _LineSegmentBuffer[lId].emissiveColor = float3(0.1, 0.6, 0.9);
+    else if (lId == 16)
+        _LineSegmentBuffer[lId].emissiveColor = float3(0.95, 0.65, 0.1);
+    else
+    {
+        _LineSegmentBuffer[lId].emissiveColor = palette(float(lId))*0.1;//0.0;
+    }
+
+    // float2 p0 = _LineSegmentBuffer[lId].p0;
+    // float angle0 = 
+    // _AngleBuffer[lId*2+0] = _LineSegmentBuffer[lId].p0;
+    // _AngleBuffer[lId*2+1] = _LineSegmentBuffer[lId].p1;
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    N = _NumPoints / 2 ;
+    float2 uv = id.xy / _Resoultion.xy;
+    float2 lofi_uv = floor(uv * 5) / 5;
+
+    sortAngles(id.xy);
+    // GroupMemoryBarrierWithGroupSync();
+
+    float3 fluence = calculateFluence(id.xy);
+
+    // float2 p = _LineSegmentBuffer[0].p0 - id.xy;
+    // _Result[id.xy] = float4(frac(abs(p) / 200.0), 0, 1);
+    // float a = angles[0] / (2.0 * PI);
+    // _Result[id.xy] = float4(a, a, a, 1);
+    // float3 fluenceDummy = 0;
+    // int hit = findIndex(angles[0], id.xy);
+    // _Result[id.xy] = float4(frac(hit / 20.0), 0, 0, 1);
+    // return;
+
+    _Result[id.xy] = float4(1.0 - 1.0 / pow(1.0 + fluence, 3.0), 1.0);
+    _Result[id.xy].a = 1.0;
+
+    for (int i = 0; i < N; ++i) {
+        drawSDF(
+            _Result[id.xy], 
+            float4(3.0 * pow(_LineSegmentBuffer[i].emissiveColor, 1.0 / 2.2), 1.0),
+            sdf(_LineSegmentBuffer[i], 0.0, id.xy)
+        );
+    }
+    
+    // _Result[id.xy] = float4(uv, 0, 1);
+}
