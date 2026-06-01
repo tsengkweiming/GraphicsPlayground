@@ -21,10 +21,10 @@ MonoBehaviour:
     m_Value: 1
   intensity:
     m_OverrideState: 1
-    m_Value: 0.25
+    m_Value: 1
   scatter:
     m_OverrideState: 1
-    m_Value: 0.5
+    m_Value: 0.75
   clamp:
     m_OverrideState: 0
     m_Value: 65472
@@ -47,6 +47,68 @@ MonoBehaviour:
   dirtIntensity:
     m_OverrideState: 0
     m_Value: 0
+--- !u!114 &-5263140126775973500
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1140c271ff0d4a9fb0dbf9990b568c7b, type: 3}
+  m_Name: DistortionEffect
+  m_EditorClassIdentifier: 
+  active: 0
+  factor:
+    m_OverrideState: 1
+    m_Value: 0
+  speed:
+    m_OverrideState: 1
+    m_Value: 0
+  scale:
+    m_OverrideState: 1
+    m_Value: 0
+  border:
+    m_OverrideState: 1
+    m_Value: 0
+--- !u!114 &-4481948942522665803
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 39321fcff7b596c4796f2a16f9193343, type: 3}
+  m_Name: OctreeGridEffect
+  m_EditorClassIdentifier: 
+  active: 1
+  factor:
+    m_OverrideState: 1
+    m_Value: 0
+  size:
+    m_OverrideState: 1
+    m_Value: 1
+  zFactor:
+    m_OverrideState: 1
+    m_Value: 0.2
+  cellCount:
+    m_OverrideState: 1
+    m_Value: 3
+  cellSize:
+    m_OverrideState: 1
+    m_Value: {x: 0.5, y: 0.5, z: 0.5}
+  zFactor2:
+    m_OverrideState: 1
+    m_Value: -0.04
+  borderColor:
+    m_OverrideState: 1
+    m_Value: {r: 1, g: 1, b: 1, a: 1}
+  borderShowRate:
+    m_OverrideState: 1
+    m_Value: 0.2
 --- !u!114 &-3357603926938260329
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -68,7 +130,7 @@ MonoBehaviour:
     m_Value: {x: 0.5, y: 0.5}
   intensity:
     m_OverrideState: 1
-    m_Value: 0.2
+    m_Value: 0
   smoothness:
     m_OverrideState: 0
     m_Value: 0.2
@@ -92,6 +154,10 @@ MonoBehaviour:
   - {fileID: -7893295128165547882}
   - {fileID: 7391319092446245454}
   - {fileID: -3357603926938260329}
+  - {fileID: 7268169518341025599}
+  - {fileID: -4481948942522665803}
+  - {fileID: 4548338353279215947}
+  - {fileID: -5263140126775973500}
 --- !u!114 &849379129802519247
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -132,6 +198,81 @@ MonoBehaviour:
   maxNits:
     m_OverrideState: 1
     m_Value: 647
+--- !u!114 &4548338353279215947
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 55f64008ddc7410aa2cdfbb586c089c9, type: 3}
+  m_Name: BlockEffect
+  m_EditorClassIdentifier: 
+  active: 0
+  factor:
+    m_OverrideState: 1
+    m_Value: 0
+  speed:
+    m_OverrideState: 1
+    m_Value: 0
+  shift:
+    m_OverrideState: 1
+    m_Value: 0
+  scaleS:
+    m_OverrideState: 1
+    m_Value: {x: 1, y: 1, z: 1, w: 1}
+  scaleL:
+    m_OverrideState: 1
+    m_Value: {x: 1, y: 1, z: 1, w: 1}
+  wave:
+    m_OverrideState: 1
+    m_Value: {x: 1, y: 1, z: -1, w: -1}
+--- !u!114 &7268169518341025599
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 604264bbad434214095f302f053a7510, type: 3}
+  m_Name: DitherEffect
+  m_EditorClassIdentifier: 
+  active: 1
+  tst: 0
+  factor:
+    m_OverrideState: 1
+    m_Value: 0
+  monoFactor:
+    m_OverrideState: 1
+    m_Value: 0
+  pixel:
+    m_OverrideState: 1
+    m_Value: 374
+  color:
+    m_OverrideState: 1
+    m_Value: 4
+  ditherStrength:
+    m_OverrideState: 1
+    m_Value: 0.01
+  maskCount:
+    m_OverrideState: 1
+    m_Value: 0
+  paletteColor0:
+    m_OverrideState: 1
+    m_Value: {r: 0.384, g: 0.776, b: 0.949, a: 1}
+  paletteColor1:
+    m_OverrideState: 1
+    m_Value: {r: 0.9173516, g: 1, b: 0, a: 1}
+  paletteColor2:
+    m_OverrideState: 1
+    m_Value: {r: 0.23100366, g: 0.3970856, b: 0.91823894, a: 1}
+  paletteColor3:
+    m_OverrideState: 1
+    m_Value: {r: 0.96603775, g: 0.6233677, b: 0.644, a: 1}
 --- !u!114 &7391319092446245454
 MonoBehaviour:
   m_ObjectHideFlags: 3

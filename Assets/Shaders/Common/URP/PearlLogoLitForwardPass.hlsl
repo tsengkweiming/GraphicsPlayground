@@ -268,7 +268,7 @@ void LitPassFragment(
     float mono = dot(col, float3(0.299, 0.587, 0.114)) * 1.;
     mono = pow(mono,0.5);
     
-    surfaceData.albedo = lerp(col, mono, _Misc);
+    surfaceData.albedo = saturate(lerp(col, mono, _Misc));
     
     half4 color = UniversalFragmentPBR(inputData, surfaceData);
     color.rgb = MixFog(color.rgb, inputData.fogCoord);

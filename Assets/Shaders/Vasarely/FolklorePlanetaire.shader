@@ -122,7 +122,8 @@ Shader "Unlit/FolklorePlanetaire"
             fixed4 frag (v2f i) : SV_Target
             {
                 // Normalized pixel coordinates (from 0 to 1)
-                float2 uv = i.uv - 0.5;
+                // float2 uv = i.uv - 0.5;
+                float2 uv = (2.0 * i.vertex.xy - _ScreenParams.xy) / _ScreenParams.y;
 
                 float2 pos = float2(uv*6.0);
 
