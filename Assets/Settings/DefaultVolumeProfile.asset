@@ -582,7 +582,7 @@ MonoBehaviour:
   color:
     m_OverrideState: 1
     m_Value: 0
-  dither:
+  ditherStrength:
     m_OverrideState: 1
     m_Value: 0.005
   maskCount:

@@ -1,4 +1,4 @@
-Shader "Hidden/PostEffect/Crosseffect"
+Shader "Hidden/PostEffect/CrossEffect"
 {
     Properties
     {
