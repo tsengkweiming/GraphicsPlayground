@@ -872,6 +872,8 @@ MonoBehaviour:
   - {fileID: -3306610859950558179}
   - {fileID: -6019592057519673798}
   - {fileID: -215350579796472406}
+  - {fileID: 5213978193297280659}
+  - {fileID: 7506636855406941121}
 --- !u!114 &853819529557874667
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1276,6 +1278,25 @@ MonoBehaviour:
   intensity:
     m_OverrideState: 1
     m_Value: 0
+--- !u!114 &5213978193297280659
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a075addff9e6c34b8c8726f5805f769, type: 3}
+  m_Name: BlurVolumeComponent
+  m_EditorClassIdentifier: 
+  active: 1
+  horizontalBlur:
+    m_OverrideState: 1
+    m_Value: 0.05
+  verticalBlur:
+    m_OverrideState: 1
+    m_Value: 0.05
 --- !u!114 &6701937180139868222
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1339,6 +1360,59 @@ MonoBehaviour:
   rounded:
     m_OverrideState: 1
     m_Value: 0
+--- !u!114 &7506636855406941121
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a789069e92b4f028fb93ffa0e512de7, type: 3}
+  m_Name: Blur
+  m_EditorClassIdentifier: 
+  active: 1
+  factor:
+    m_OverrideState: 1
+    m_Value: 0
+  lod:
+    m_OverrideState: 1
+    m_Value: 0
+  lerpInStartEnd:
+    m_OverrideState: 1
+    m_Value: {x: 1, y: 1}
+  lerpOutStartEnd:
+    m_OverrideState: 1
+    m_Value: {x: 1, y: 1}
+  maskIntensity:
+    m_OverrideState: 1
+    m_Value: 0
+  contrast:
+    m_OverrideState: 1
+    m_Value: 0
+  iterations:
+    m_OverrideState: 1
+    m_Value: 3
+  blurSize:
+    m_OverrideState: 1
+    m_Value: 1
+  gain:
+    m_OverrideState: 1
+    m_Value: 1
+  peak:
+    m_OverrideState: 1
+    m_Value: 1
+  threshold:
+    m_OverrideState: 1
+    m_Value: 0
+  intensity:
+    m_OverrideState: 1
+    m_Value: 1
+  alphaMask:
+    m_OverrideState: 1
+    m_Value: {fileID: 0}
+    dimension: 1
 --- !u!114 &7518938298396184218
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1367,6 +1441,53 @@ MonoBehaviour:
   scale:
     m_OverrideState: 1
     m_Value: 1
+--- !u!114 &8295439798791816833
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 639beb581c17da44bbfd757b3ff527ce, type: 3}
+  m_Name: FastBlurVolumeComponent
+  m_EditorClassIdentifier: 
+  active: 1
+  intensity:
+    m_OverrideState: 1
+    m_Value: 1
+  downSample:
+    m_OverrideState: 1
+    m_Value: 2
+  iterations:
+    m_OverrideState: 1
+    m_Value: 3
+  blurSize:
+    m_OverrideState: 1
+    m_Value: 1
+  compositeMode:
+    m_OverrideState: 1
+    m_Value: 0
+  debugBlur:
+    m_OverrideState: 1
+    m_Value: 0
+  alphaMask:
+    m_OverrideState: 1
+    m_Value: {fileID: 0}
+    dimension: 1
+  maskIntensity:
+    m_OverrideState: 1
+    m_Value: 0
+  contrast:
+    m_OverrideState: 1
+    m_Value: 1
+  lerpInStartEnd:
+    m_OverrideState: 1
+    m_Value: {x: 0, y: 1}
+  lerpOutStartEnd:
+    m_OverrideState: 1
+    m_Value: {x: 1, y: 2}
 --- !u!114 &8947322562483315757
 MonoBehaviour:
   m_ObjectHideFlags: 3

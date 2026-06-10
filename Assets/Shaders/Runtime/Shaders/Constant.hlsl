@@ -1,0 +1,8 @@
+﻿#ifndef POSTEFFECT_GRAPH_HLSL_INCLUDE_CONSTANT
+#define POSTEFFECT_GRAPH_HLSL_INCLUDE_CONSTANT
+
+#ifndef PI
+static const float PI = 3.141592653f;
+#endif
+
+#endif

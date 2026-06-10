@@ -59,7 +59,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1140c271ff0d4a9fb0dbf9990b568c7b, type: 3}
   m_Name: DistortionEffect
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   factor:
     m_OverrideState: 1
     m_Value: 0
@@ -84,7 +84,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0a075addff9e6c34b8c8726f5805f769, type: 3}
   m_Name: BlurVolumeComponent
   m_EditorClassIdentifier: 
-  active: 1
+  active: 0
   horizontalBlur:
     m_OverrideState: 1
     m_Value: 0.015
@@ -320,6 +320,53 @@ MonoBehaviour:
   clamp:
     m_OverrideState: 0
     m_Value: 0.05
+--- !u!114 &7482277992098742170
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 639beb581c17da44bbfd757b3ff527ce, type: 3}
+  m_Name: FastBlurVolumeComponent
+  m_EditorClassIdentifier: 
+  active: 0
+  intensity:
+    m_OverrideState: 1
+    m_Value: 0.53
+  downSample:
+    m_OverrideState: 1
+    m_Value: 5
+  iterations:
+    m_OverrideState: 1
+    m_Value: 3
+  blurSize:
+    m_OverrideState: 1
+    m_Value: 3.89
+  compositeMode:
+    m_OverrideState: 1
+    m_Value: 0
+  debugBlur:
+    m_OverrideState: 1
+    m_Value: 0
+  alphaMask:
+    m_OverrideState: 1
+    m_Value: {fileID: 0}
+    dimension: 1
+  maskIntensity:
+    m_OverrideState: 1
+    m_Value: 1
+  contrast:
+    m_OverrideState: 1
+    m_Value: 1
+  lerpInStartEnd:
+    m_OverrideState: 0
+    m_Value: {x: 0, y: 1}
+  lerpOutStartEnd:
+    m_OverrideState: 0
+    m_Value: {x: 1, y: 2}
 --- !u!114 &7591030262505439511
 MonoBehaviour:
   m_ObjectHideFlags: 3
