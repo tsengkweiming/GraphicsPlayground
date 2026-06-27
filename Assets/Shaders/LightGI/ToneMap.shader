@@ -60,7 +60,6 @@ Shader "LightGI/ToneMap"
             {
                 float3 hdr = tex2D(_MainTex, i.uv).rgb;
                 float3 sdr = linearToSRGB(reinhard(hdr));
-                return 1;
                 return fixed4(sdr, 1.0);
             }
             ENDCG

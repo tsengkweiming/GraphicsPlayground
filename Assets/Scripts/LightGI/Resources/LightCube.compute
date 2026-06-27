@@ -1,5 +1,8 @@
 #pragma kernel CSMain
 
+#include "../../../Shaders/Common/SDF.hlsl"
+#include "../../../Shaders/Common/Transform.hlsl"
+
 #define MAX_RAYS     8          // rays cast per pixel per frame
 #define MAX_STEPS    80         // max sphere-march steps per ray
 #define MAX_DIST     650.0      // max light travel distance (pixels)
@@ -35,30 +38,6 @@ float _RotateXMultiplier;
 float _RotateYMultiplier;
 
 // ---------------------------------------------------------------------------
-//  Rotation matrices 
-// ---------------------------------------------------------------------------
-float3x3 Rx(float a) {
-    float c = cos(a), s = sin(a);
-    return float3x3(1.0, 0.0, 0.0,
-                    0.0,   c,  -s,
-                    0.0,   s,   c);
-}
-float3x3 Ry(float a) {
-    float c = cos(a), s = sin(a);
-    return float3x3(  c, 0.0,   s,
-                    0.0, 1.0, 0.0,
-                     -s, 0.0,   c);
-}
-
-// ---------------------------------------------------------------------------
-//  2D capsule SDF
-// ---------------------------------------------------------------------------
-float sdCap2D(float2 p, float2 a, float2 b, float r) {
-    float2 pa = p - a, ba = b - a;
-    return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0)) - r;
-}
-
-// ---------------------------------------------------------------------------
 //  HSL → RGB  (h,s,l each in [0,1])
 //  Matches p5.js colorMode(HSL,100) with hue ÷ 100 as h
 // ---------------------------------------------------------------------------
@@ -92,7 +71,7 @@ float evalScene(float2 p, float t, out float3 col, out float isLight) {
     // Shared rotation matrix: R = Ry(t*c*3) * Rx(t*b*3)
     // (p5 applies rotateX first, then rotateY in the same push/pop → Ry*Rx order)
     // float3x3 R = Ry(t * SPD_ROTY * 3.0) * Rx(t * SPD_ROTX * 3.0);
-    float3x3 R = mul(Ry(t * _RotateYMultiplier * 3.0), Rx(t * _RotateXMultiplier * 3.0));
+    float3x3 rotation = mul(RotateY(t * _RotateYMultiplier * 3.0), RotateX(t * _RotateXMultiplier * 3.0));
 
     // Conservative bounding radius for all 12 edges of a cube
     float boundR = cubeR * 1.8 + _EdgeThickness;
@@ -102,9 +81,9 @@ float evalScene(float2 p, float t, out float3 col, out float isLight) {
     isLight = 0.0;
 
     for (int ci = 0; ci < _CubeCount; ci++) {
-        float fi     = float(ci);
-        float orbAng = fi * TAU / float(_CubeCount) + t * _OrbitAngularSpeed;
-        float2  orbit  = float2(cos(orbAng), sin(orbAng)) * orbR;
+        float fi      = float(ci);
+        float orbAng  = fi * TAU / float(_CubeCount) + t * _OrbitAngularSpeed;
+        float2 orbit  = float2(cos(orbAng), sin(orbAng)) * orbR;
 
         // Bounding circle early-out — skip full edge check if impossible to win
         if (length(p - orbit) - boundR >= minD) continue;
@@ -121,8 +100,8 @@ float evalScene(float2 p, float t, out float3 col, out float isLight) {
             for (int iy = 0; iy < 2; iy++) {
                 float sx = (ix == 0) ? -1.0 : 1.0;
                 float sy = (iy == 0) ? -1.0 : 1.0;
-                float2 va = mul(R, float3(sx, sy, -1.0) * cubeR).xy + orbit;
-                float2 vb = mul(R, float3(sx, sy,  1.0) * cubeR).xy + orbit;
+                float2 va = mul(rotation, float3(sx, sy, -1.0) * cubeR).xy + orbit;
+                float2 vb = mul(rotation, float3(sx, sy,  1.0) * cubeR).xy + orbit;
                 float ed = sdCap2D(p, va, vb, _EdgeThickness);
                 if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
             }
@@ -133,8 +112,8 @@ float evalScene(float2 p, float t, out float3 col, out float isLight) {
             for (int iz = 0; iz < 2; iz++) {
                 float sy = (iy == 0) ? -1.0 : 1.0;
                 float sz = (iz == 0) ? -1.0 : 1.0;
-                float2 va = mul(R, float3(-1.0, sy, sz) * cubeR).xy + orbit;
-                float2 vb = mul(R, float3( 1.0, sy, sz) * cubeR).xy + orbit;
+                float2 va = mul(rotation, float3(-1.0, sy, sz) * cubeR).xy + orbit;
+                float2 vb = mul(rotation, float3( 1.0, sy, sz) * cubeR).xy + orbit;
                 float ed = sdCap2D(p, va, vb, _EdgeThickness);
                 if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
             }
@@ -145,13 +124,19 @@ float evalScene(float2 p, float t, out float3 col, out float isLight) {
             for (int iz = 0; iz < 2; iz++) {
                 float sx = (ix == 0) ? -1.0 : 1.0;
                 float sz = (iz == 0) ? -1.0 : 1.0;
-                float2 va = mul(R, float3(sx, -1.0, sz) * cubeR).xy + orbit;
-                float2 vb = mul(R, float3(sx,  1.0, sz) * cubeR).xy + orbit;
+                float2 va = mul(rotation, float3(sx, -1.0, sz) * cubeR).xy + orbit;
+                float2 vb = mul(rotation, float3(sx,  1.0, sz) * cubeR).xy + orbit;
                 float ed = sdCap2D(p, va, vb, _EdgeThickness);
                 if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
             }
         }
     }
+
+    float tb = PI*(0.5+0.5*cos(t*10.0+2.0));
+    float2 sc = float2(sin(tb),cos(tb));
+    float ed = sdArc(p, sc, 100, 0.75);
+    if (ed < minD) { minD = ed; col = 0.7; isLight = 1.0; }
+
     return minD;
 }
 
@@ -208,7 +193,7 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
 
     float3 current = gathered / _MaxRay;
     float3 prev    = _PrevFrame.SampleLevel(sampler_PrevFrame, uv, 0).rgb;
-    float  blend   = (_Frame == 0) ? 1.0 : 0.5;
+    float  blend   = _Frame == 0 ? 1.0 : 0.9;
 
     _Result[id.xy] = float4(lerp(prev, current, blend), 1.0);
 }

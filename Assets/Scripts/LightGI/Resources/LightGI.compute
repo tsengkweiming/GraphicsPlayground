@@ -1,0 +1,259 @@
+#pragma kernel CSMain
+
+#include "../../../Shaders/Common/SDF.hlsl"
+#include "../../../Shaders/Common/Transform.hlsl"
+
+#define MAX_RAYS     8          // rays cast per pixel per frame
+#define MAX_STEPS    120        // max sphere-march steps per ray
+#define MAX_DIST     600.0      // max light travel distance (pixels)
+#define ATT_POW      2.0        // attenuation exponent
+#ifndef PI
+#define PI           3.14159265359
+#endif
+#ifndef TAU
+#define TAU          6.28318530718
+#endif
+#define GOLDEN_ANGLE (PI * 0.7639320225)
+#define K 30                         // Number of sticks (maps to obj_density=7 in the original, range 10–50)
+#define K_OCC (_ObjectCount / 3)     // First K_OCC sticks are occluders, the rest are emitters
+
+// Rotation speeds — analogue of p5's random(1,3) with a fixed seed.
+// Tweak to change animation character.
+
+RWTexture2D<float4> _Result;       // write — current frame
+Texture2D<float4>   _PrevFrame;   // read  — previous frame
+SamplerState        sampler_PrevFrame;
+
+float2 _Resolution;
+float  _Time;
+int    _Frame;
+
+int _MaxRay;
+int _MaxStep;
+int _MaxDist;
+float _AttenuationPower;
+int _ObjectCount;
+float _EdgeThickness;
+float _OrbitAngularSpeed;
+float _RotateXMultiplier;
+float _RotateYMultiplier;
+float2 _StickSize;
+int _LightType;
+static const int STICK_MODE = 0;
+static const int CUBE_MODE = 1;
+static const int CIRCLE_MODE = 2;
+
+
+// ---------------------------------------------------------------------------
+//  Noise  (smooth 3D value noise, approximates p5's Perlin noise)
+// ---------------------------------------------------------------------------
+float _h(float3 p){p=frac(p*0.3183099+0.1);p*=17.0; return frac(p.x*p.y*p.z*(p.x+p.y+p.z));}
+
+float noise3(float3 p) {
+    float3 i = floor(p);
+    float3 f = frac(p);
+    float3 u = f * f * (3.0 - 2.0 * f);  // smoothstep
+    return lerp(
+        lerp(lerp(_h(i+float3(0,0,0)), _h(i+float3(1,0,0)), u.x),
+            lerp(_h(i+float3(0,1,0)), _h(i+float3(1,1,0)), u.x), u.y),
+        lerp(lerp(_h(i+float3(0,0,1)), _h(i+float3(1,0,1)), u.x),
+            lerp(_h(i+float3(0,1,1)), _h(i+float3(1,1,1)), u.x), u.y), u.z);
+}
+
+// ---------------------------------------------------------------------------
+//  Per-stick deterministic color (replaces p5's random())
+// ---------------------------------------------------------------------------
+float3 stickColor(float idx) {
+    // Hue-spread palette so sticks are visually distinct
+    float h = frac(idx * 0.137);
+    return 0.5 + 0.5 * cos(TAU * (h + float3(0.0, 0.333, 0.667)));
+}
+
+// ---------------------------------------------------------------------------
+//  HSL → RGB  (h,s,l each in [0,1])
+//  Matches p5.js colorMode(HSL,100) with hue ÷ 100 as h
+// ---------------------------------------------------------------------------
+float3 hsl2rgb(float h, float s, float l) {
+    float3 rgb = clamp(abs(fmod(h * 6.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+    return l + s * (rgb - 0.5) * (1.0 - abs(2.0 * l - 1.0));
+}
+
+// Per-pixel stochastic noise (different seed each frame for temporal AA)
+float hash21(float2 p, float seed) {
+    return frac(sin(dot(p + seed, float2(127.1, 311.7))) * 43758.5453);
+}
+
+// ---------------------------------------------------------------------------
+//  Scene: N_CUBES rotating colored wireframe cubes
+//
+//  Returns: SDF to nearest edge
+//  Outputs: col (linear emissive), isLight (+1 emitter, −1 occluder)
+//
+//  Performance note: bounding-circle early-out skips the 12 capsule evals
+//  per cube when that cube is clearly not the nearest object.
+// ---------------------------------------------------------------------------
+float evalScene(float2 p, float t, out float3 col, out float isLight) {
+
+    float minD  = 1e9;
+    col     = 0.0;
+    isLight = 0.0;
+
+    if (_LightType == STICK_MODE)
+    {
+        // Stick half-extents (matching p5 rect(-40,-5,80,10))
+        float2 halfOne = _StickSize;
+        for (int i = 0; i < _ObjectCount; i++) {
+            float fi = float(i);
+ 
+            // Perlin-noise-driven position (p5: noise(i*10, 0, t) → [-w/2, w/2])
+            float nx = (noise3(float3(fi * 10.0, 0.0,    t      )) * 2.0 - 1.0) * _Resolution.x * 0.5;
+            float ny = (noise3(float3(fi * 10.0, 100.0,  t      )) * 2.0 - 1.0) * _Resolution.y * 0.5;
+            // Perlin-noise-driven rotation (p5: noise(i*10, 1000, t*4) → [-PI, PI])
+            float ang = (noise3(float3(fi * 10.0, 1000.0, t * 4.0)) * 2.0 - 1.0) * PI;
+ 
+            float d = sdOBox(p, float2(nx, ny), ang, halfOne);
+ 
+            if (d < minD) {
+                minD = d;
+                if (i < K_OCC) {
+                    // Occluder: dark (p5 color was [0.1, 0.1, 0.1])
+                    col     = 0.06;
+                    isLight = -1.0;
+                } else {
+                    // Emitter: colored
+                    col     = stickColor(fi);
+                    isLight = 1.0;
+                }
+            }
+        }
+    }
+
+    else if (_LightType == CUBE_MODE)
+    {
+        float sceneSize = min(_Resolution.x, _Resolution.y);
+        
+        // Cube parameters (both oscillate with cos(t), matching p5 original)
+        float d      = (cos(t) + 1.0) * sceneSize * 0.2;       // orbit radius oscillator
+        float orbR   = d + sceneSize / 20.0;                   // actual orbit radius
+        float cubeR  = sceneSize * lerp(0.2, 0.1, (cos(t) + 1.0) * 0.5); // cube half-size
+        float3x3 rotation = mul(RotateY(t * _RotateYMultiplier * 3.0), RotateX(t * _RotateXMultiplier * 3.0));
+
+        // Conservative bounding radius for all 12 edges of a cube
+        float boundR = cubeR * 1.8 + _EdgeThickness;
+        
+        for (int ci = 0; ci < _ObjectCount; ci++) {
+            float fi      = float(ci);
+            float orbAng  = fi * TAU / float(_ObjectCount) + t * _OrbitAngularSpeed;
+            float2 orbit  = float2(cos(orbAng), sin(orbAng)) * orbR;
+
+            // Bounding circle early-out — skip full edge check if impossible to win
+            if (length(p - orbit) - boundR >= minD) continue;
+
+            // Color: evenly spaced hues, S=1.0, L=0.6 — matching HSL(angle, 100, 60)/100
+            float3 cubeCol = hsl2rgb(fi / float(_ObjectCount), 1.0, 0.6);
+
+            // 12 edges grouped by axis direction.
+            // Each group: iterate over the 4 sign combinations of the two fixed coords.
+            // Endpoints: float3(±sA, ±sB, −1)*cubeR → R → project → +orbit
+
+            // --- Z-direction edges (x,y fixed; z: −cubeR → +cubeR) ---
+            for (int ix = 0; ix < 2; ix++) {
+                for (int iy = 0; iy < 2; iy++) {
+                    float sx = (ix == 0) ? -1.0 : 1.0;
+                    float sy = (iy == 0) ? -1.0 : 1.0;
+                    float2 va = mul(rotation, float3(sx, sy, -1.0) * cubeR).xy + orbit;
+                    float2 vb = mul(rotation, float3(sx, sy,  1.0) * cubeR).xy + orbit;
+                    float ed = sdCap2D(p, va, vb, _EdgeThickness);
+                    if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
+                }
+            }
+
+            // --- X-direction edges (y,z fixed; x: −cubeR → +cubeR) ---
+            for (int iy = 0; iy < 2; iy++) {
+                for (int iz = 0; iz < 2; iz++) {
+                    float sy = (iy == 0) ? -1.0 : 1.0;
+                    float sz = (iz == 0) ? -1.0 : 1.0;
+                    float2 va = mul(rotation, float3(-1.0, sy, sz) * cubeR).xy + orbit;
+                    float2 vb = mul(rotation, float3( 1.0, sy, sz) * cubeR).xy + orbit;
+                    float ed = sdCap2D(p, va, vb, _EdgeThickness);
+                    if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
+                }
+            }
+
+            // --- Y-direction edges (x,z fixed; y: −cubeR → +cubeR) ---
+            for (int ix = 0; ix < 2; ix++) {
+                for (int iz = 0; iz < 2; iz++) {
+                    float sx = (ix == 0) ? -1.0 : 1.0;
+                    float sz = (iz == 0) ? -1.0 : 1.0;
+                    float2 va = mul(rotation, float3(sx, -1.0, sz) * cubeR).xy + orbit;
+                    float2 vb = mul(rotation, float3(sx,  1.0, sz) * cubeR).xy + orbit;
+                    float ed = sdCap2D(p, va, vb, _EdgeThickness);
+                    if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
+                }
+            }
+        }
+    }
+    return minD;
+}
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID) {
+    if (any(id.xy >= (uint2)_Resolution)) return;
+
+    float2 fragCoord = id.xy + 0.5;
+    float2 uv        = fragCoord / _Resolution;
+    float2 p         = fragCoord - _Resolution * 0.5;
+    float  t         = _Time * 0.1;
+
+    float3 surfCol;
+    float  surfLight;
+    float  dSurf = evalScene(p, t, surfCol, surfLight);
+
+    if (dSurf < 0.5) {
+        float3 outCol = surfLight > 0.0 ? surfCol * 1.8 : 0.03;
+        _Result[id.xy] = float4(outCol, 1.0);
+        return;
+    }
+
+    
+    // ---- Radiance gathering ----
+    float frameHash = frac(float(_Frame) * 0.61803398875);
+    float randAngle = hash21(fragCoord / _Resolution.xy, frameHash) * TAU;
+    
+    // ... golden-angle ray loop (identical logic, HLSL syntax) ...
+    float3 gathered = 0;
+    // [loop] for (int i = 0; i < MAX_RAYS; i++) { ... }
+    [loop]
+    for (int i = 0; i < _MaxRay; i++) {
+        float angle    = randAngle + GOLDEN_ANGLE * float(i);
+        float2  dir    = float2(cos(angle), sin(angle));
+        float marchDist = max(dSurf, 0.5);
+
+        for (int s = 0; s < _MaxStep; s++) {
+            if (marchDist > _MaxDist) break;
+
+            float2 mp  = p + dir * marchDist;
+            float3 col = 0;
+            float isLt;
+            float sd = evalScene(mp, t, col, isLt);
+
+            if (sd < 0.5) {
+                if (isLt > 0.0) {
+                    // Emitter hit: inverse-power attenuation
+                    float att = pow(clamp(1.0 - marchDist / _MaxDist, 0.0, 1.0), _AttenuationPower);
+                    gathered += col * att;
+                }
+                // Occluder or emitter surface: stop marching either way
+                break;
+            }
+            // Safe SDF step — never overshoot a surface
+            marchDist += max(sd, 0.3);
+        }
+    }
+
+    float3 current = gathered / _MaxRay;
+    float3 prev    = _PrevFrame.SampleLevel(sampler_PrevFrame, uv, 0).rgb;
+    float  blend   = _Frame == 0 ? 1.0 : 0.75;
+
+    _Result[id.xy] = float4(lerp(prev, current, blend), 1.0);
+}
