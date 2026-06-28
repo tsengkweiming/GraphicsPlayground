@@ -1,57 +1,72 @@
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 [System.Serializable]
-public class LightGIParam
+public struct Dot2d
 {
-    public LightType LightType;
-    [Range(1,20)] public int MaxRay;
-    public int MaxStep;
-    [Range(0,3000)] public int MaxDist;
-    public float AttenuationPower;
-    [Range(1,40)] public int ObjectCount;
-    [Range(0.5f,8)] public float EdgeThickness = 2.0f;
-    public Vector2 StickSize = new (40, 5);
-    public float OrbitAngularSpeed;
-    public float RotateXMultiplier;
-    public float RotateYMultiplier;
-}
+    public Vector2 Position;
+    public float   Curvature;    // 0: straight, > 0: curvature
+    public int     StartOfNext;
+    public Color   Color;
+};
 
-public enum LightType { Stick, Cube, Circle, Rose, Spiral, RectWeave, BoxFrame3D, Text }
+[System.Serializable]
+public struct Character
+{
+    public Dot2d[] Dots;
+    public int     Id;        // order id of the text
+    public Vector3 Position;  // do some boid?
+    public Vector3 Velocity;
+    public Vector3 Scale;
+};
 
-[RequireComponent(typeof(Camera))]
-public class LightGIController : MonoBehaviour
+[System.Serializable]
+public struct Text
+{
+    public Character[] Characters;
+    public Vector3     Position;
+    public Vector3     Velocity;
+};
+public class ProceduralTextGIController : MonoBehaviour
 {
     [SerializeField] private ComputeShader  _lightCompute;
     [SerializeField] private Shader         _toneShader;
     [SerializeField] private LightGIParam _lightGIParam;
-
+    [SerializeField] private Text[] _texts;
+    private Text[] _lastTexts;
+    private GraphicsBuffer _textBuffer;
+    
     private Camera            _camera;
     private Material          _toneMappingMaterial;
     private RenderTexture[]   _rts        = new RenderTexture[2];
     private int               _current    = 0;
     private int               _frameCount = 0;
     private int               _kernel     = -1;
-
-    // ─── Lifecycle ────────────────────────────────────────────────────────────
-
+    
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         _camera               = GetComponent<Camera>();
         _toneMappingMaterial  = new Material(_toneShader);
         _kernel               = _lightCompute.FindKernel("CSMain");
         InitRTs(_camera.pixelWidth, _camera.pixelHeight);
-
-        RenderPipelineManager.endCameraRendering += OnEndCameraRendering;
     }
 
-    void OnDestroy()
+    // Update is called once per frame
+    void Update()
+    {
+    }
+
+    private void OnDestroy()
     {
         RenderPipelineManager.endCameraRendering -= OnEndCameraRendering;
         ReleaseRTs();
         if (_toneMappingMaterial != null) Destroy(_toneMappingMaterial);
+        _textBuffer?.Release();
+        _textBuffer = null;
     }
-
+    
     // ─── Per-frame render callback ────────────────────────────────────────────
 
     private void OnEndCameraRendering(ScriptableRenderContext ctx, Camera cam)
@@ -69,6 +84,14 @@ public class LightGIController : MonoBehaviour
             _frameCount = 0;
         }
 
+        if (_lastTexts != _texts)
+        {
+            _textBuffer.Release();
+            _textBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _texts.Length, Marshal.SizeOf(typeof(Text)));
+            _textBuffer.SetData(_texts);
+            _lastTexts = _texts;
+        }
+        
         // Dispatch compute shader.
         _lightCompute.SetTexture(_kernel, "_Result",     _rts[_current]);
         _lightCompute.SetTexture(_kernel, "_PrevFrame", _rts[1 - _current]);
@@ -86,6 +109,7 @@ public class LightGIController : MonoBehaviour
         _lightCompute.SetFloat ("_RotateXMultiplier", _lightGIParam.RotateXMultiplier);
         _lightCompute.SetFloat ("_RotateYMultiplier", _lightGIParam.RotateYMultiplier);
         _lightCompute.SetVector("_StickSize", _lightGIParam.StickSize);
+        _lightCompute.SetBuffer(_kernel, "_TextBuffer", _textBuffer);
 
         int gx = Mathf.CeilToInt(w / 8f);
         int gy = Mathf.CeilToInt(h / 8f);

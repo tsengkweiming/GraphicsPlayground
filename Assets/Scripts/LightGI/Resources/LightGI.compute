@@ -2,6 +2,7 @@
 
 #include "../../../Shaders/Common/SDF.hlsl"
 #include "../../../Shaders/Common/Transform.hlsl"
+#include "../../../Shaders/ProceduralText/ProceduralText.hlsl"
 
 #define MAX_RAYS     8          // rays cast per pixel per frame
 #define MAX_STEPS    120        // max sphere-march steps per ray
@@ -15,13 +16,12 @@
 #endif
 #define GOLDEN_ANGLE (PI * 0.7639320225)
 #define K 30                         // Number of sticks (maps to obj_density=7 in the original, range 10–50)
-#define K_OCC (_ObjectCount / 3)     // First K_OCC sticks are occluders, the rest are emitters
 
 // Rotation speeds — analogue of p5's random(1,3) with a fixed seed.
 // Tweak to change animation character.
 
-RWTexture2D<float4> _Result;       // write — current frame
-Texture2D<float4>   _PrevFrame;   // read  — previous frame
+RWTexture2D<float4> _Result;      // write — current frame
+Texture2D           _PrevFrame;   // read  — previous frame
 SamplerState        sampler_PrevFrame;
 
 float2 _Resolution;
@@ -39,10 +39,14 @@ float _RotateXMultiplier;
 float _RotateYMultiplier;
 float2 _StickSize;
 int _LightType;
+
 static const int STICK_MODE = 0;
 static const int CUBE_MODE = 1;
 static const int CIRCLE_MODE = 2;
-
+static const int ROSE_MODE = 3;
+static const int SPIRAL_MODE = 4;
+static const int RECT_WEAVE_MODE = 5;
+static const int TEXT_MODE = 6;
 
 // ---------------------------------------------------------------------------
 //  Noise  (smooth 3D value noise, approximates p5's Perlin noise)
@@ -83,119 +87,233 @@ float hash21(float2 p, float seed) {
     return frac(sin(dot(p + seed, float2(127.1, 311.7))) * 43758.5453);
 }
 
-// ---------------------------------------------------------------------------
-//  Scene: N_CUBES rotating colored wireframe cubes
-//
-//  Returns: SDF to nearest edge
-//  Outputs: col (linear emissive), isLight (+1 emitter, −1 occluder)
-//
-//  Performance note: bounding-circle early-out skips the 12 capsule evals
-//  per cube when that cube is clearly not the nearest object.
-// ---------------------------------------------------------------------------
-float evalScene(float2 p, float t, out float3 col, out float isLight) {
+float hash11(float n) {
+    return frac(sin(n * 127.1) * 43758.5453);
+}
 
-    float minD  = 1e9;
-    col     = 0.0;
+float2 rectWeaveLightDir(float t) {
+    float2 d = float2(cos(t * 1.7 + 0.6), sin(t * 1.13 - 0.4));
+    return d / max(length(d), 0.0001);
+}
+
+float evalScenePattern(float2 p, float t, out float3 col, out float isLight) {
+    float minD = 1e9;
+    col = 0.0;
     isLight = 0.0;
+
+    int objectCount = max(_ObjectCount, 1);
+    float invObjectCount = 1.0 / float(objectCount);
+    float edgeR = max(_EdgeThickness, 0.5);
+    float sceneSize = min(_Resolution.x, _Resolution.y);
 
     if (_LightType == STICK_MODE)
     {
-        // Stick half-extents (matching p5 rect(-40,-5,80,10))
-        float2 halfOne = _StickSize;
-        for (int i = 0; i < _ObjectCount; i++) {
+        float2 halfOne = max(_StickSize, float2(0.001, 0.001));
+        int occluderCount = min(objectCount - 1, max(0, (int)floor(float(objectCount) * 0.33333334)));
+
+        for (int i = 0; i < objectCount; i++) {
             float fi = float(i);
- 
-            // Perlin-noise-driven position (p5: noise(i*10, 0, t) → [-w/2, w/2])
-            float nx = (noise3(float3(fi * 10.0, 0.0,    t      )) * 2.0 - 1.0) * _Resolution.x * 0.5;
-            float ny = (noise3(float3(fi * 10.0, 100.0,  t      )) * 2.0 - 1.0) * _Resolution.y * 0.5;
-            // Perlin-noise-driven rotation (p5: noise(i*10, 1000, t*4) → [-PI, PI])
-            float ang = (noise3(float3(fi * 10.0, 1000.0, t * 4.0)) * 2.0 - 1.0) * PI;
- 
-            float d = sdOBox(p, float2(nx, ny), ang, halfOne);
- 
+            float nx = (noise3(float3(fi * 10.0, 0.0, t)) * 2.0 - 1.0) * _Resolution.x * 0.5;
+            float ny = (noise3(float3(fi * 10.0, 100.0, t)) * 2.0 - 1.0) * _Resolution.y * 0.5;
+            float angle = (noise3(float3(fi * 10.0, 1000.0, t * 4.0)) * 2.0 - 1.0) * PI;
+            float angleX = (noise3(float3(fi * 10.0, 653.0, t * 4.0)) * 2.0 - 1.0) * PI;
+            // float d = sdOBox(p, float2(nx, ny), angle, halfOne);
+            float3  q = float3(p - float2(nx, ny), 0);
+            float3x3 rotation = RotationMatrix(float3(0, 0, angle));
+            q = mul(rotation, q);
+            float d = sdBoxFrame(q, float3(halfOne, 0.1), 0.5);
+
             if (d < minD) {
                 minD = d;
-                if (i < K_OCC) {
-                    // Occluder: dark (p5 color was [0.1, 0.1, 0.1])
-                    col     = 0.06;
+                if (i < occluderCount) {
+                    col = 0.06;
                     isLight = -1.0;
                 } else {
-                    // Emitter: colored
-                    col     = stickColor(fi);
+                    col = stickColor(fi);
                     isLight = 1.0;
                 }
             }
         }
     }
-
     else if (_LightType == CUBE_MODE)
     {
-        float sceneSize = min(_Resolution.x, _Resolution.y);
-        
-        // Cube parameters (both oscillate with cos(t), matching p5 original)
-        float d      = (cos(t) + 1.0) * sceneSize * 0.2;       // orbit radius oscillator
-        float orbR   = d + sceneSize / 20.0;                   // actual orbit radius
-        float cubeR  = sceneSize * lerp(0.2, 0.1, (cos(t) + 1.0) * 0.5); // cube half-size
+        float orbitOsc = (cos(t) + 1.0) * sceneSize * 0.2;
+        float orbR = orbitOsc + sceneSize / 20.0;
+        float cubeR = sceneSize * lerp(0.2, 0.1, (cos(t) + 1.0) * 0.5);
         float3x3 rotation = mul(RotateY(t * _RotateYMultiplier * 3.0), RotateX(t * _RotateXMultiplier * 3.0));
+        float boundR = cubeR * 1.8 + edgeR;
 
-        // Conservative bounding radius for all 12 edges of a cube
-        float boundR = cubeR * 1.8 + _EdgeThickness;
-        
-        for (int ci = 0; ci < _ObjectCount; ci++) {
-            float fi      = float(ci);
-            float orbAng  = fi * TAU / float(_ObjectCount) + t * _OrbitAngularSpeed;
-            float2 orbit  = float2(cos(orbAng), sin(orbAng)) * orbR;
+        for (int ci = 0; ci < objectCount; ci++) {
+            float fi = float(ci);
+            float orbAng = fi * TAU * invObjectCount + t * _OrbitAngularSpeed;
+            float2 orbit = float2(cos(orbAng), sin(orbAng)) * orbR;
 
-            // Bounding circle early-out — skip full edge check if impossible to win
             if (length(p - orbit) - boundR >= minD) continue;
 
-            // Color: evenly spaced hues, S=1.0, L=0.6 — matching HSL(angle, 100, 60)/100
-            float3 cubeCol = hsl2rgb(fi / float(_ObjectCount), 1.0, 0.6);
+            float3 cubeCol = hsl2rgb(fi * invObjectCount, 1.0, 0.6);
 
-            // 12 edges grouped by axis direction.
-            // Each group: iterate over the 4 sign combinations of the two fixed coords.
-            // Endpoints: float3(±sA, ±sB, −1)*cubeR → R → project → +orbit
-
-            // --- Z-direction edges (x,y fixed; z: −cubeR → +cubeR) ---
-            for (int ix = 0; ix < 2; ix++) {
-                for (int iy = 0; iy < 2; iy++) {
-                    float sx = (ix == 0) ? -1.0 : 1.0;
-                    float sy = (iy == 0) ? -1.0 : 1.0;
+            for (int zIx = 0; zIx < 2; zIx++) {
+                for (int zIy = 0; zIy < 2; zIy++) {
+                    float sx = (zIx == 0) ? -1.0 : 1.0;
+                    float sy = (zIy == 0) ? -1.0 : 1.0;
                     float2 va = mul(rotation, float3(sx, sy, -1.0) * cubeR).xy + orbit;
                     float2 vb = mul(rotation, float3(sx, sy,  1.0) * cubeR).xy + orbit;
-                    float ed = sdCap2D(p, va, vb, _EdgeThickness);
+                    float ed = sdCap2D(p, va, vb, edgeR);
                     if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
                 }
             }
 
-            // --- X-direction edges (y,z fixed; x: −cubeR → +cubeR) ---
-            for (int iy = 0; iy < 2; iy++) {
-                for (int iz = 0; iz < 2; iz++) {
-                    float sy = (iy == 0) ? -1.0 : 1.0;
-                    float sz = (iz == 0) ? -1.0 : 1.0;
+            for (int xIy = 0; xIy < 2; xIy++) {
+                for (int xIz = 0; xIz < 2; xIz++) {
+                    float sy = (xIy == 0) ? -1.0 : 1.0;
+                    float sz = (xIz == 0) ? -1.0 : 1.0;
                     float2 va = mul(rotation, float3(-1.0, sy, sz) * cubeR).xy + orbit;
                     float2 vb = mul(rotation, float3( 1.0, sy, sz) * cubeR).xy + orbit;
-                    float ed = sdCap2D(p, va, vb, _EdgeThickness);
+                    float ed = sdCap2D(p, va, vb, edgeR);
                     if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
                 }
             }
 
-            // --- Y-direction edges (x,z fixed; y: −cubeR → +cubeR) ---
-            for (int ix = 0; ix < 2; ix++) {
-                for (int iz = 0; iz < 2; iz++) {
-                    float sx = (ix == 0) ? -1.0 : 1.0;
-                    float sz = (iz == 0) ? -1.0 : 1.0;
+            for (int yIx = 0; yIx < 2; yIx++) {
+                for (int yIz = 0; yIz < 2; yIz++) {
+                    float sx = (yIx == 0) ? -1.0 : 1.0;
+                    float sz = (yIz == 0) ? -1.0 : 1.0;
                     float2 va = mul(rotation, float3(sx, -1.0, sz) * cubeR).xy + orbit;
                     float2 vb = mul(rotation, float3(sx,  1.0, sz) * cubeR).xy + orbit;
-                    float ed = sdCap2D(p, va, vb, _EdgeThickness);
+                    float ed = sdCap2D(p, va, vb, edgeR);
                     if (ed < minD) { minD = ed; col = cubeCol; isLight = 1.0; }
                 }
             }
         }
     }
+    else if (_LightType == CIRCLE_MODE)
+    {
+        float pulse = 0.5 + 0.5 * cos(t * 5.0);
+        float coreR = sceneSize * lerp(0.11, 0.18, pulse);
+        minD = sdRing(p, coreR, edgeR * 1.5);
+        col = hsl2rgb(frac(t * 0.08), 0.95, 0.62);
+        isLight = 1.0;
+
+        for (int i = 0; i < objectCount; i++) {
+            float fi = float(i);
+            float a = fi * TAU * invObjectCount + t * (_OrbitAngularSpeed + 0.35);
+            float wobble = 0.5 + 0.5 * sin(t * 3.0 + fi * 1.618);
+            float r = sceneSize * lerp(0.26, 0.40, wobble);
+            float2 center = float2(cos(a), sin(a)) * r;
+            float ringR = sceneSize * lerp(0.025, 0.055, 0.5 + 0.5 * sin(t * 6.0 + fi));
+            float ed = sdRing(p - center, ringR, edgeR);
+            if (ed < minD) {
+                minD = ed;
+                col = hsl2rgb(frac(fi * invObjectCount + t * 0.12), 1.0, 0.6);
+                isLight = 1.0;
+            }
+        }
+    }
+    else if (_LightType == ROSE_MODE)
+    {
+        float2 q = rotate2D(p, t * 0.45);
+        float a = atan2(q.y, q.x);
+        float r = length(q);
+        float petals = 5.0 + floor(fmod(float(objectCount), 5.0));
+        float wave = 0.5 + 0.5 * cos(a * petals - t * 5.0);
+        float roseR = sceneSize * (0.16 + 0.18 * wave);
+
+        minD = abs(r - roseR) - edgeR * 1.3;
+        col = hsl2rgb(frac(a / TAU + t * 0.08), 0.9, 0.58);
+        isLight = 1.0;
+
+        float occluderR = sceneSize * (0.055 + 0.025 * sin(t * 4.0));
+        float occluderD = sdDisk(q, occluderR);
+        if (occluderD < minD) {
+            minD = occluderD;
+            col = 0.025;
+            isLight = -1.0;
+        }
+    }
+    else if (_LightType == SPIRAL_MODE)
+    {
+        const int armCount = 5;
+        float armCountF = float(armCount);
+        int segmentCount = objectCount;
+        float invSegmentCount = 1.0 / float(segmentCount);
+        float spiralTurns = 0.78 + 0.08 * sin(t * 2.0);
+        float spin = t * 0.55;
+
+        for (int arm = 0; arm < armCount; arm++) {
+            float armPhase = float(arm) * TAU / armCountF + spin;
+            float2 localP = rotate2D(p, -armPhase);
+
+            for (int i = 0; i < segmentCount; i++) {
+                float fi = float(i);
+                float u0 = fi * invSegmentCount;
+                float u1 = (fi + 1.0) * invSegmentCount;
+                float wave0 = 0.5 + 0.5 * sin(t * 4.0 + fi * 0.77 + float(arm));
+                float wave1 = 0.5 + 0.5 * sin(t * 4.0 + (fi + 1.0) * 0.77 + float(arm));
+                float theta0 = u0 * TAU * spiralTurns;
+                float theta1 = u1 * TAU * spiralTurns;
+                float r0 = sceneSize * lerp(0.05, 0.46, u0) + sceneSize * 0.018 * wave0;
+                float r1 = sceneSize * lerp(0.05, 0.46, u1) + sceneSize * 0.018 * wave1;
+                float2 aPos = float2(cos(theta0), sin(theta0)) * r0;
+                float2 bPos = float2(cos(theta1), sin(theta1)) * r1;
+                float ed = sdCap2D(localP, aPos, bPos, edgeR * 1.35);
+
+                if (ed < minD) {
+                    minD = ed;
+                    col = hsl2rgb(frac(u0 + float(arm) / armCountF + t * 0.18), 0.95, 0.62);
+                    isLight = 1.0;
+                }
+            }
+        }
+    }
+    else if (_LightType == RECT_WEAVE_MODE)
+    {
+        int rectCount = min(max(objectCount * 5, 32), 64);
+        float lightIntensity = 0.55 + 0.45 * sin(t * 2.7);
+        float2 lightDir = rectWeaveLightDir(t);
+        float2 sweepDir = float2(-lightDir.y, lightDir.x);
+
+        for (int i = 0; i < rectCount; i++) {
+            float fi = float(i);
+            float family = floor(fmod(fi, 4.0));
+            float lane = floor(fi * 0.25);
+            float rndA = hash11(fi + 11.7);
+            float rndB = hash11(fi + 41.3);
+            float rndC = hash11(fi + 83.9);
+            float familyAng = family * PI * 0.25;
+            float angle = familyAng + 0.22 * sin(t * 0.9 + fi * 0.31) + (rndA - 0.5) * 0.24;
+            float2 axis = float2(cos(angle), sin(angle));
+            float2 normal = float2(-axis.y, axis.x);
+            float laneOffset = (lane - float(rectCount) * 0.125) * sceneSize * 0.072;
+            float drift = sin(t * (0.55 + rndB) + fi * 1.37) * sceneSize * 0.09;
+            float2 center = normal * laneOffset + axis * drift;
+            float2 halfSize = float2(sceneSize * lerp(0.30, 0.58, rndB), edgeR * lerp(1.25, 3.8, rndC));
+            float d = sdOBox(p, center, angle, halfSize);
+
+            if (d < minD) {
+                float facing = saturate(0.18 + 0.82 * (0.5 + 0.5 * dot(axis, lightDir)));
+                float sweep = saturate(0.18 + 0.82 * (0.5 + 0.5 * dot(center, sweepDir) / max(sceneSize * 0.52, 0.0001)));
+                float pulse = 0.35 + 0.65 * hash11(fi * 19.19 + floor(t * 8.0));
+                float intensity = lightIntensity * facing * sweep * pulse;
+
+                minD = d;
+                if (fmod(fi, 7.0) < 1.0) {
+                    col = 0.025 + 0.025 * intensity;
+                    isLight = -1.0;
+                } else {
+                    float hue = frac(0.57 + fi * 0.037 + t * 0.04);
+                    col = hsl2rgb(hue, 0.88, 0.56) * (0.18 + 2.4 * intensity);
+                    isLight = 1.0;
+                }
+            }
+        }
+    }
+    else if (_LightType == TEXT_MODE)
+    {
+        
+    }
+
     return minD;
 }
-
 [numthreads(8, 8, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID) {
     if (any(id.xy >= (uint2)_Resolution)) return;
@@ -205,9 +323,17 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
     float2 p         = fragCoord - _Resolution * 0.5;
     float  t         = _Time * 0.1;
 
+    // if (_LightType == BOX_FRAME_3D_MODE) {
+    //     float3 current = renderBoxFrame3D(fragCoord, uv, t);
+    //     float3 prev = _PrevFrame.SampleLevel(sampler_PrevFrame, uv, 0).rgb;
+    //     float blend = _Frame == 0 ? 1.0 : 0.86;
+    //     _Result[id.xy] = float4(lerp(prev, current, blend), 1.0);
+    //     return;
+    // }
+
     float3 surfCol;
     float  surfLight;
-    float  dSurf = evalScene(p, t, surfCol, surfLight);
+    float  dSurf = evalScenePattern(p, t, surfCol, surfLight);
 
     if (dSurf < 0.5) {
         float3 outCol = surfLight > 0.0 ? surfCol * 1.8 : 0.03;
@@ -227,6 +353,11 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
     for (int i = 0; i < _MaxRay; i++) {
         float angle    = randAngle + GOLDEN_ANGLE * float(i);
         float2  dir    = float2(cos(angle), sin(angle));
+        float dirDimming = 1.0;
+        if (_LightType == RECT_WEAVE_MODE) {
+            float2 beamDir = rectWeaveLightDir(t);
+            dirDimming = pow(saturate(0.15 + 0.85 * (0.5 + 0.5 * dot(dir, beamDir))), 1.7);
+        }
         float marchDist = max(dSurf, 0.5);
 
         for (int s = 0; s < _MaxStep; s++) {
@@ -235,13 +366,13 @@ void CSMain(uint3 id : SV_DispatchThreadID) {
             float2 mp  = p + dir * marchDist;
             float3 col = 0;
             float isLt;
-            float sd = evalScene(mp, t, col, isLt);
+            float sd = evalScenePattern(mp, t, col, isLt);
 
             if (sd < 0.5) {
                 if (isLt > 0.0) {
                     // Emitter hit: inverse-power attenuation
                     float att = pow(clamp(1.0 - marchDist / _MaxDist, 0.0, 1.0), _AttenuationPower);
-                    gathered += col * att;
+                    gathered += col * att * dirDimming;
                 }
                 // Occluder or emitter surface: stop marching either way
                 break;
