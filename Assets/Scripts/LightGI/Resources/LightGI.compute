@@ -313,8 +313,8 @@ float evalScenePattern(float2 p, float t, out float3 col, out float isLight) {
         if (_TextCount > 0 && _CharacterCount > 0 && _DotCount > 1)
         {
             float4 textColor;
-            minD = sdProceduralText2D(p, edgeR, textColor);
             col = textColor.rgb * max(textColor.a, 1.0) * 2.4;
+            minD = sdProceduralText2D(p, edgeR, t, textColor);
             isLight = 1.0;
         }
     }
