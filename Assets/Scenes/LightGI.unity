@@ -240,6 +240,51 @@ MonoBehaviour:
   m_LightCookieSize: {x: 1, y: 1}
   m_LightCookieOffset: {x: 0, y: 0}
   m_SoftShadowQuality: 0
+--- !u!1 &1426722770
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1426722772}
+  - component: {fileID: 1426722771}
+  m_Layer: 0
+  m_Name: FPSSetter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1426722771
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1426722770}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4c6c16c61b93014790d5929e0e4daf8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _targetFPS: 30
+--- !u!4 &1426722772
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1426722770}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1503831988
 GameObject:
   m_ObjectHideFlags: 0
@@ -253,6 +298,7 @@ GameObject:
   - component: {fileID: 1503831989}
   - component: {fileID: 1503831993}
   - component: {fileID: 1503831994}
+  - component: {fileID: 1503831995}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -385,7 +431,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1503831988}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b4a32fd9f9711a4ab318666f675685b, type: 3}
   m_Name: 
@@ -399,14 +445,227 @@ MonoBehaviour:
     MaxDist: 160
     AttenuationPower: 1.5
     ObjectCount: 6
-    EdgeThickness: 0.01
+    EdgeThickness: 0.5
     StickSize: {x: 40, y: 1}
     OrbitAngularSpeed: 1.7
     RotateXMultiplier: 1.3
     RotateYMultiplier: 2.1
+--- !u!114 &1503831995
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1503831988}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 12a989070ad806f43a1900a0ee0c1e61, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _lightCompute: {fileID: 7200000, guid: 131aa1b9513207843964e4334acfc519, type: 3}
+  _toneShader: {fileID: 4800000, guid: e4f7524ed15f8af4ca13cdc1c452a3dc, type: 3}
+  _textGIParam:
+    LightType: 7
+    MaxRay: 16
+    MaxStep: 20
+    MaxDist: 180
+    AttenuationPower: 1
+    ObjectCount: 15
+    EdgeThickness: 2
+    StickSize: {x: 40, y: 5}
+    OrbitAngularSpeed: 1.7
+    RotateXMultiplier: 1.3
+    RotateYMultiplier: 2.1
+  _dots:
+  - Position: {x: 0, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0, y: 1}
+    Curvature: 1.1
+    StartOfNext: 1
+    Color: {r: 0.45124534, g: 0.4566037, b: 0.09132071, a: 1}
+  - Position: {x: 1, y: 0.8}
+    Curvature: 1.1
+    StartOfNext: 1
+    Color: {r: 0.4509804, g: 0.45490196, b: 0.09019608, a: 1}
+  - Position: {x: 0, y: 0.6}
+    Curvature: 0
+    StartOfNext: 0
+    Color: {r: 0.28975463, g: 1, b: 0, a: 0.45882353}
+  - Position: {x: 0, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.17610079, g: 0.36610284, b: 1, a: 0.65882355}
+  - Position: {x: 0.5, y: 1}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.5544042, g: 0.25338554, b: 0.81886786, a: 0.6392157}
+  - Position: {x: 1, y: 0}
+    Curvature: 0
+    StartOfNext: 0
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0.85, y: 0.3}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.3525011, g: 0.453, b: 0.8930817, a: 0.57254905}
+  - Position: {x: 0.15, y: 0.3}
+    Curvature: 0
+    StartOfNext: 0
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.25786167, g: 1, b: 0.96138257, a: 0.49803922}
+  - Position: {x: 0, y: 1}
+    Curvature: 1
+    StartOfNext: 1
+    Color: {r: 0.21176472, g: 0.3195022, b: 0.83137256, a: 0.57254905}
+  - Position: {x: 1, y: 0.8}
+    Curvature: 1
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0, y: 0.6}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.40170878, g: 0.4581144, b: 0.81886786, a: 0.92156863}
+  - Position: {x: 1, y: 0}
+    Curvature: 0
+    StartOfNext: 0
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 1, g: 0.22641522, b: 0.22641522, a: 0.74509805}
+  - Position: {x: 0.5, y: 1}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 1, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.93207544, g: 0.24972595, b: 0.6403461, a: 0.47843137}
+  - Position: {x: 0.85, y: 0.3}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0.15, y: 0.3}
+    Curvature: 0
+    StartOfNext: 0
+    Color: {r: 0.6415094, g: 0.178, b: 0.10490094, a: 0.46666667}
+  - Position: {x: 0, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.7622642, g: 0.5716337, b: 0.106429376, a: 0.60784316}
+  - Position: {x: 0, y: 1}
+    Curvature: 0.6
+    StartOfNext: 1
+    Color: {r: 0.89411765, g: 0.5459664, b: 0.1254902, a: 0.6666667}
+  - Position: {x: 1, y: 0.5}
+    Curvature: 0.6
+    StartOfNext: 1
+    Color: {r: 0.893983, g: 0.95094335, b: 0.15430397, a: 0.53333336}
+  - Position: {x: 0, y: 0}
+    Curvature: 1
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0.5, y: 1}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.28099442, g: 1, b: 0, a: 0.7647059}
+  - Position: {x: 0.5, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 1, y: 0.7}
+    Curvature: -0.59
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0.5, y: 1}
+    Curvature: -0.74
+    StartOfNext: 1
+    Color: {r: 0, g: 1, b: 0.5254902, a: 0.68235296}
+  - Position: {x: 0, y: 0.7}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 1, y: 0.3}
+    Curvature: 0.72
+    StartOfNext: 1
+    Color: {r: 0, g: 0.580286, b: 1, a: 0.64705884}
+  - Position: {x: 0.5, y: 0}
+    Curvature: 0.8
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0, y: 0.3}
+    Curvature: 0
+    StartOfNext: 0
+    Color: {r: 0.72590256, g: 0.33285883, b: 0.9622642, a: 0.5529412}
+  - Position: {x: 1, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0, y: 0}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0, y: 1}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 1, y: 1}
+    Curvature: 0
+    StartOfNext: 0
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  - Position: {x: 0, y: 0.5}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0.20754719, g: 0.20754719, b: 0.20754719, a: 0.4745098}
+  - Position: {x: 1, y: 0.5}
+    Curvature: 0
+    StartOfNext: 1
+    Color: {r: 0, g: 0, b: 0, a: 0}
+  _characters:
+  - DotOffset: 0
+    DotCount: 4
+    Position: {x: -700, y: 0, z: 0}
+    Scale: {x: 30, y: 80, z: 30}
+  - DotOffset: 4
+    DotCount: 5
+    Position: {x: -500, y: 0, z: 0}
+    Scale: {x: 30, y: 80, z: 30}
+  - DotOffset: 9
+    DotCount: 5
+    Position: {x: -300, y: 0, z: 0}
+    Scale: {x: 30, y: 80, z: 30}
+  - DotOffset: 14
+    DotCount: 5
+    Position: {x: -100, y: 0, z: 0}
+    Scale: {x: 30, y: 80, z: 30}
+  - DotOffset: 19
+    DotCount: 4
+    Position: {x: 100, y: 0, z: 0}
+    Scale: {x: 30, y: 80, z: 30}
+  - DotOffset: 23
+    DotCount: 2
+    Position: {x: 300, y: 0, z: 0}
+    Scale: {x: 30, y: 80, z: 30}
+  - DotOffset: 25
+    DotCount: 6
+    Position: {x: 500, y: 0, z: 0}
+    Scale: {x: 30, y: 80, z: 30}
+  - DotOffset: 31
+    DotCount: 6
+    Position: {x: 700, y: 0, z: 0}
+    Scale: {x: 30, y: 80, z: 30}
+  _texts:
+  - CharOffset: 0
+    CharCount: 8
+    Position: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1503831991}
   - {fileID: 477356330}
+  - {fileID: 1426722772}
