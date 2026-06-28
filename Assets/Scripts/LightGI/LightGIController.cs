@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -32,6 +33,13 @@ public class LightGIController : MonoBehaviour
     private int               _current    = 0;
     private int               _frameCount = 0;
     private int               _kernel     = -1;
+    private GraphicsBuffer    _emptyDotBuffer;
+    private GraphicsBuffer    _emptyCharacterBuffer;
+    private GraphicsBuffer    _emptyTextBuffer;
+
+    private static readonly Dot2d[] EmptyDots = { default };
+    private static readonly Character[] EmptyCharacters = { default };
+    private static readonly Text[] EmptyTexts = { default };
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -41,6 +49,7 @@ public class LightGIController : MonoBehaviour
         _toneMappingMaterial  = new Material(_toneShader);
         _kernel               = _lightCompute.FindKernel("CSMain");
         InitRTs(_camera.pixelWidth, _camera.pixelHeight);
+        InitTextFallbackBuffers();
 
         RenderPipelineManager.endCameraRendering += OnEndCameraRendering;
     }
@@ -49,7 +58,28 @@ public class LightGIController : MonoBehaviour
     {
         RenderPipelineManager.endCameraRendering -= OnEndCameraRendering;
         ReleaseRTs();
+        ReleaseTextFallbackBuffers();
         if (_toneMappingMaterial != null) Destroy(_toneMappingMaterial);
+    }
+
+    private void InitTextFallbackBuffers()
+    {
+        _emptyDotBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf(typeof(Dot2d)));
+        _emptyCharacterBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf(typeof(Character)));
+        _emptyTextBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf(typeof(Text)));
+        _emptyDotBuffer.SetData(EmptyDots);
+        _emptyCharacterBuffer.SetData(EmptyCharacters);
+        _emptyTextBuffer.SetData(EmptyTexts);
+    }
+
+    private void ReleaseTextFallbackBuffers()
+    {
+        _emptyDotBuffer?.Release();
+        _emptyDotBuffer = null;
+        _emptyCharacterBuffer?.Release();
+        _emptyCharacterBuffer = null;
+        _emptyTextBuffer?.Release();
+        _emptyTextBuffer = null;
     }
 
     // ─── Per-frame render callback ────────────────────────────────────────────
@@ -86,6 +116,12 @@ public class LightGIController : MonoBehaviour
         _lightCompute.SetFloat ("_RotateXMultiplier", _lightGIParam.RotateXMultiplier);
         _lightCompute.SetFloat ("_RotateYMultiplier", _lightGIParam.RotateYMultiplier);
         _lightCompute.SetVector("_StickSize", _lightGIParam.StickSize);
+        _lightCompute.SetInt   ("_DotCount",       0);
+        _lightCompute.SetInt   ("_CharacterCount", 0);
+        _lightCompute.SetInt   ("_TextCount",      0);
+        _lightCompute.SetBuffer(_kernel, "_DotBuffer", _emptyDotBuffer);
+        _lightCompute.SetBuffer(_kernel, "_CharacterBuffer", _emptyCharacterBuffer);
+        _lightCompute.SetBuffer(_kernel, "_TextBuffer", _emptyTextBuffer);
 
         int gx = Mathf.CeilToInt(w / 8f);
         int gy = Mathf.CeilToInt(h / 8f);

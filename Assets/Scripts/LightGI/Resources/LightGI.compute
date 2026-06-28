@@ -46,7 +46,8 @@ static const int CIRCLE_MODE = 2;
 static const int ROSE_MODE = 3;
 static const int SPIRAL_MODE = 4;
 static const int RECT_WEAVE_MODE = 5;
-static const int TEXT_MODE = 6;
+static const int BOX_FRAME_3D_MODE = 6;
+static const int TEXT_MODE = 7;
 
 // ---------------------------------------------------------------------------
 //  Noise  (smooth 3D value noise, approximates p5's Perlin noise)
@@ -103,7 +104,7 @@ float evalScenePattern(float2 p, float t, out float3 col, out float isLight) {
 
     int objectCount = max(_ObjectCount, 1);
     float invObjectCount = 1.0 / float(objectCount);
-    float edgeR = max(_EdgeThickness, 0.5);
+    float edgeR = _EdgeThickness;
     float sceneSize = min(_Resolution.x, _Resolution.y);
 
     if (_LightType == STICK_MODE)
@@ -309,7 +310,13 @@ float evalScenePattern(float2 p, float t, out float3 col, out float isLight) {
     }
     else if (_LightType == TEXT_MODE)
     {
-        
+        if (_TextCount > 0 && _CharacterCount > 0 && _DotCount > 1)
+        {
+            float4 textColor;
+            minD = sdProceduralText2D(p, edgeR, textColor);
+            col = textColor.rgb * max(textColor.a, 1.0) * 2.4;
+            isLight = 1.0;
+        }
     }
 
     return minD;
