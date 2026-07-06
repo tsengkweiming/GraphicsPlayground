@@ -32,10 +32,14 @@ public class BlurRenderPass : ScriptableRenderPass
     public bool UpdateBlurSettings()
     {
         if (_material == null) return false;
+
+        var volumeManager = VolumeManager.instance;
+        if (volumeManager == null || !volumeManager.isInitialized || volumeManager.stack == null)
+            return false;
         
         // Use the Volume settings or the default settings if no Volume is set.
-        var blurVolume = VolumeManager.instance.stack.GetComponent<BlurVolumeComponent>();
-        if (blurVolume.IsActive() == false) return false;
+        var blurVolume = volumeManager.stack.GetComponent<BlurVolumeComponent>();
+        if (blurVolume == null || blurVolume.IsActive() == false) return false;
         
         float horizontalBlur = blurVolume.horizontalBlur.overrideState
             ? blurVolume.horizontalBlur.value

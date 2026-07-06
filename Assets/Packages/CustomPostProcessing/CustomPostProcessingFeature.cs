@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -6,17 +6,35 @@ using UnityEngine.Rendering.Universal;
 public class CustomPostProcessingFeature : ScriptableRendererFeature
 {
    private List<CustomPostProcessing> mCustomPostProcessings;
+   private bool mInitialized;
 
    private CustomPostProcessingPass mAfterOpaqueAndSkyPass;
    private CustomPostProcessingPass mBeforePostProcessPass;
    private CustomPostProcessingPass mAfterPostProcessPass;
    public override void Create()
    {
-      var stack = VolumeManager.instance.stack;
-      //获取所有CustomProcessings实例
-      mCustomPostProcessings = VolumeManager.instance.baseComponentTypes
+      mInitialized = false;
+      mCustomPostProcessings = null;
+      mAfterOpaqueAndSkyPass = null;
+      mBeforePostProcessPass = null;
+      mAfterPostProcessPass = null;
+   }
+
+   private bool EnsureInitialized()
+   {
+      if (mInitialized) return true;
+
+      var volumeManager = VolumeManager.instance;
+      if (volumeManager == null || !volumeManager.isInitialized || volumeManager.stack == null)
+         return false;
+
+      var stack = volumeManager.stack;
+      // Collect all CustomPostProcessing instances after VolumeManager is ready.
+      mCustomPostProcessings = volumeManager.baseComponentTypes
          .Where(t => t.IsSubclassOf(typeof(CustomPostProcessing)))
-         .Select(t => stack.GetComponent(t) as CustomPostProcessing).ToList();
+         .Select(t => stack.GetComponent(t) as CustomPostProcessing)
+         .Where(c => c != null)
+         .ToList();
 
       var afterOpaqueAndSkyCPPs = mCustomPostProcessings.Where(c => c.evt == CustomPostProcessEvent.AfterOpaqueAndSky)
          .OrderBy(c => c.OrderInEvent).ToList();
@@ -34,29 +52,32 @@ public class CustomPostProcessingFeature : ScriptableRendererFeature
       mAfterPostProcessPass =
          new CustomPostProcessingPass("Custom PostProcess after PostProcess", afterPostProcessCPPs);
       mAfterPostProcessPass.renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing;
+
+      mInitialized = true;
+      return true;
    }
 
    public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
    {
-      if (renderingData.cameraData.postProcessEnabled)
+      if (!renderingData.cameraData.postProcessEnabled) return;
+      if (!EnsureInitialized()) return;
+
+      if (mAfterOpaqueAndSkyPass != null && mAfterOpaqueAndSkyPass.SetupCustomPostProcessing())
       {
-         if (mAfterOpaqueAndSkyPass.SetupCustomPostProcessing())
-         {
-            mAfterOpaqueAndSkyPass.ConfigureInput(ScriptableRenderPassInput.Color);
-            renderer.EnqueuePass(mAfterOpaqueAndSkyPass);
-         }
+         mAfterOpaqueAndSkyPass.ConfigureInput(ScriptableRenderPassInput.Color);
+         renderer.EnqueuePass(mAfterOpaqueAndSkyPass);
+      }
 
-         if (mBeforePostProcessPass.SetupCustomPostProcessing())
-         {
-            mBeforePostProcessPass.ConfigureInput(ScriptableRenderPassInput.Color);
-            renderer.EnqueuePass(mBeforePostProcessPass);
-         }
+      if (mBeforePostProcessPass != null && mBeforePostProcessPass.SetupCustomPostProcessing())
+      {
+         mBeforePostProcessPass.ConfigureInput(ScriptableRenderPassInput.Color);
+         renderer.EnqueuePass(mBeforePostProcessPass);
+      }
 
-         if (mAfterPostProcessPass.SetupCustomPostProcessing())
-         {
-            mAfterPostProcessPass.ConfigureInput(ScriptableRenderPassInput.Color);
-            renderer.EnqueuePass(mAfterPostProcessPass);
-         }
+      if (mAfterPostProcessPass != null && mAfterPostProcessPass.SetupCustomPostProcessing())
+      {
+         mAfterPostProcessPass.ConfigureInput(ScriptableRenderPassInput.Color);
+         renderer.EnqueuePass(mAfterPostProcessPass);
       }
    }
 
@@ -66,11 +87,12 @@ public class CustomPostProcessingFeature : ScriptableRendererFeature
       if(disposing && mCustomPostProcessings!=null)
          foreach (var item in mCustomPostProcessings)
          {
-            item.Dispose();
+            item?.Dispose();
          }
-      mAfterOpaqueAndSkyPass.Dispose();
-      mBeforePostProcessPass.Dispose();
-      mAfterPostProcessPass.Dispose();
+      mAfterOpaqueAndSkyPass?.Dispose();
+      mBeforePostProcessPass?.Dispose();
+      mAfterPostProcessPass?.Dispose();
+      mInitialized = false;
       
    }
 }

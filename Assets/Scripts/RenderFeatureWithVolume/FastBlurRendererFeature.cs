@@ -9,17 +9,9 @@ public sealed class FastBlurRendererFeature : ScriptableRendererFeature
 {
     #region FEATURE_FIELDS
 
-    // Declare the material used to render the post-processing effect.
-    // Add a [SerializeField] attribute so Unity serializes the property and includes it in builds.
-    [SerializeField]
-    [HideInInspector]
-    private Material m_Material;
     [SerializeField] private Shader _shader;
     [SerializeField] private RenderPassEvent _renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
     private FastBlurRenderPass _fastBlurRenderPass;
-
-    // Declare the render pass that renders the effect.
-    private FastBlurRenderPass m_FullScreenPass;
 
     #endregion
 
@@ -29,6 +21,9 @@ public sealed class FastBlurRendererFeature : ScriptableRendererFeature
     // Unity calls this method when the Scriptable Renderer Feature loads for the first time, and when you change a property.
     public override void Create()
     {
+        _fastBlurRenderPass?.Dispose();
+        _fastBlurRenderPass = null;
+
         _shader = Shader.Find("Kitte/FastBlur");
         if (_shader == null) return;
         _fastBlurRenderPass = new FastBlurRenderPass(_shader)
@@ -40,35 +35,38 @@ public sealed class FastBlurRendererFeature : ScriptableRendererFeature
     // Override the AddRenderPasses method to inject passes into the renderer. Unity calls AddRenderPasses once per camera.
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        // Skip rendering if m_Material or the pass instance are null.
-        if (m_Material == null || m_FullScreenPass == null)
-            return;
+        if (_fastBlurRenderPass == null) return;
 
         // Skip rendering if the target is a Reflection Probe or a preview camera.
         if (renderingData.cameraData.cameraType == CameraType.Preview || renderingData.cameraData.cameraType == CameraType.Reflection)
             return;
 
+        var volumeManager = VolumeManager.instance;
+        if (volumeManager == null || !volumeManager.isInitialized || volumeManager.stack == null)
+            return;
+
         // Skip rendering if the camera is outside the custom volume.
-        FastBlurVolumeComponent myVolume = VolumeManager.instance.stack?.GetComponent<FastBlurVolumeComponent>();
+        FastBlurVolumeComponent myVolume = volumeManager.stack.GetComponent<FastBlurVolumeComponent>();
         if (myVolume == null || !myVolume.IsActive())
             return;
 
         // Specify when the effect will execute during the frame.
         // For a post-processing effect, the injection point is usually BeforeRenderingTransparents, BeforeRenderingPostProcessing, or AfterRenderingPostProcessing.
         // For more information, refer to https://docs.unity3d.com/Manual/urp/customize/custom-pass-injection-points.html 
-        m_FullScreenPass.renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing;
+        _fastBlurRenderPass.renderPassEvent = _renderPassEvent;
 
         // Specify that the effect doesn't need scene depth, normals, motion vectors, or the color texture as input.
-        m_FullScreenPass.ConfigureInput(ScriptableRenderPassInput.None);
+        _fastBlurRenderPass.ConfigureInput(ScriptableRenderPassInput.None);
 
         // Add the render pass to the renderer.
-        renderer.EnqueuePass(m_FullScreenPass);
+        renderer.EnqueuePass(_fastBlurRenderPass);
     }
 
     protected override void Dispose(bool disposing)
     {
         // Free the resources the render pass uses.
-        m_FullScreenPass.Dispose();
+        _fastBlurRenderPass?.Dispose();
+        _fastBlurRenderPass = null;
     }
 
     #endregion
@@ -158,7 +156,10 @@ public sealed class FastBlurRendererFeature : ScriptableRendererFeature
 
             // Set the material properties based on the blended values of the custom volume.
             // For more information, refer to https://docs.unity3d.com/Manual/urp/post-processing/custom-post-processing-with-volume.html
-            FastBlurVolumeComponent myVolume = VolumeManager.instance.stack?.GetComponent<FastBlurVolumeComponent>();
+            var volumeManager = VolumeManager.instance;
+            FastBlurVolumeComponent myVolume = volumeManager != null && volumeManager.isInitialized
+                ? volumeManager.stack?.GetComponent<FastBlurVolumeComponent>()
+                : null;
             if (myVolume != null)
                 s_SharedPropertyBlock.SetFloat("_Intensity", myVolume.intensity.value);
 
@@ -249,6 +250,9 @@ public sealed class FastBlurRendererFeature : ScriptableRendererFeature
         public void Dispose()
         {
             m_CopiedColor?.Release();
+            m_CopiedColor = null;
+            CoreUtils.Destroy(m_Material);
+            m_Material = null;
         }
 
         #endregion

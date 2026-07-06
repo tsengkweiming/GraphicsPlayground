@@ -11,6 +11,9 @@ public class BlurRendererFeature : ScriptableRendererFeature
     
     public override void Create()
     {
+        _blurRenderPass?.Dispose();
+        _blurRenderPass = null;
+
         _shader = Shader.Find("CustomEffects/Blur");
         if (_shader == null) return;
         _blurRenderPass = new BlurRenderPass(_shader)
@@ -21,6 +24,7 @@ public class BlurRendererFeature : ScriptableRendererFeature
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        if (_blurRenderPass == null) return;
         if (renderingData.cameraData.cameraType != CameraType.Game) return;
         
         if (_blurRenderPass.UpdateBlurSettings() == false) return;
@@ -30,7 +34,8 @@ public class BlurRendererFeature : ScriptableRendererFeature
 
     protected override void Dispose(bool disposing)
     {
-        _blurRenderPass.Dispose();
+        _blurRenderPass?.Dispose();
+        _blurRenderPass = null;
     }
 }
 
