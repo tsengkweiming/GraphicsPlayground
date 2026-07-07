@@ -18,11 +18,29 @@
 #ifndef PROCEDURAL_TEXT_RANDOM_ROTATION_SPEED
 #define PROCEDURAL_TEXT_RANDOM_ROTATION_SPEED 8.0
 #endif
+#ifndef PROCEDURAL_TEXT_RANDOM_ROTATION_X_MAX
+#define PROCEDURAL_TEXT_RANDOM_ROTATION_X_MAX 3
+#endif
+#ifndef PROCEDURAL_TEXT_RANDOM_ROTATION_X_SPEED
+#define PROCEDURAL_TEXT_RANDOM_ROTATION_X_SPEED 4.0
+#endif
+#ifndef PROCEDURAL_TEXT_PERSPECTIVE
+#define PROCEDURAL_TEXT_PERSPECTIVE 650.0
+#endif
 #ifndef PROCEDURAL_TEXT_RANDOM_POSITION_MAX
 #define PROCEDURAL_TEXT_RANDOM_POSITION_MAX 8.0
 #endif
 #ifndef PROCEDURAL_TEXT_RANDOM_POSITION_SPEED
 #define PROCEDURAL_TEXT_RANDOM_POSITION_SPEED 1.0
+#endif
+#ifndef PROCEDURAL_TEXT_DETAIL_BAND
+#define PROCEDURAL_TEXT_DETAIL_BAND 48.0
+#endif
+#ifndef PROCEDURAL_TEXT_BOUND_PADDING
+#define PROCEDURAL_TEXT_BOUND_PADDING 8.0
+#endif
+#ifndef PROCEDURAL_TEXT_MOTION_DETAIL
+#define PROCEDURAL_TEXT_MOTION_DETAIL 0
 #endif
 
 // ─── Structs ────────────────────────────────────────────────────
@@ -91,9 +109,26 @@ float proceduralTextCharacterAngle(int textIndex, int charIndex, Character chara
                + float(charIndex) * 37.91
                + dot(character.position.xy, float2(0.071, 0.137));
     float noiseX = seed + time * PROCEDURAL_TEXT_RANDOM_ROTATION_SPEED;
-    float noise = proceduralTextPerlin1D(noiseX) * 0.72
-                + proceduralTextPerlin1D(noiseX * 0.47 + seed * 0.13 + 19.7) * 0.28;
+    float noise = proceduralTextPerlin1D(noiseX);
+#if PROCEDURAL_TEXT_MOTION_DETAIL
+    noise = noise * 0.72
+          + proceduralTextPerlin1D(noiseX * 0.47 + seed * 0.13 + 19.7) * 0.28;
+#endif
     return clamp(noise, -1.0, 1.0) * PROCEDURAL_TEXT_RANDOM_ROTATION_MAX;
+}
+
+float proceduralTextCharacterXAngle(int textIndex, int charIndex, Character character, float time)
+{
+    float seed = float(textIndex) * 71.43
+               + float(charIndex) * 47.29
+               + dot(character.position.xy, float2(0.113, 0.191));
+    float noiseX = seed + time * PROCEDURAL_TEXT_RANDOM_ROTATION_X_SPEED;
+    float noise = proceduralTextPerlin1D(noiseX);
+#if PROCEDURAL_TEXT_MOTION_DETAIL
+    noise = noise * 0.7
+          + proceduralTextPerlin1D(noiseX * 0.53 + seed * 0.17 + 31.3) * 0.3;
+#endif
+    return clamp(noise, -1.0, 1.0) * PROCEDURAL_TEXT_RANDOM_ROTATION_X_MAX;
 }
 
 float2 proceduralTextCharacterOffset(int textIndex, int charIndex, Character character, float time)
@@ -104,25 +139,53 @@ float2 proceduralTextCharacterOffset(int textIndex, int charIndex, Character cha
     float noiseX = seed + time * PROCEDURAL_TEXT_RANDOM_POSITION_SPEED;
     float noiseY = seed * 1.37 + 47.3 + time * PROCEDURAL_TEXT_RANDOM_POSITION_SPEED * 0.83;
     float2 noise = float2(
-        proceduralTextPerlin1D(noiseX) * 0.74 + proceduralTextPerlin1D(noiseX * 0.41 + 23.1) * 0.26,
-        proceduralTextPerlin1D(noiseY) * 0.74 + proceduralTextPerlin1D(noiseY * 0.43 + 71.9) * 0.26
+        proceduralTextPerlin1D(noiseX),
+        proceduralTextPerlin1D(noiseY)
     );
+#if PROCEDURAL_TEXT_MOTION_DETAIL
+    noise = noise * 0.74 + float2(
+        proceduralTextPerlin1D(noiseX * 0.41 + 23.1),
+        proceduralTextPerlin1D(noiseY * 0.43 + 71.9)
+    ) * 0.26;
+#endif
 
     return clamp(noise, -1.0, 1.0) * PROCEDURAL_TEXT_RANDOM_POSITION_MAX;
 }
 
-float2 proceduralTextDotPosition(Dot2d dot, Character character, Text text, float angle, float2 offset)
+float2 proceduralTextCharacterScale(Character character)
 {
-    float2 scale = float2(
+    return float2(
         proceduralTextSafeScale(character.scale.x),
         proceduralTextSafeScale(character.scale.y)
     );
+}
 
+float proceduralTextCharacterBoundRadius(float2 scale, float radius)
+{
+    return length(abs(scale)) * 1.35 + radius + PROCEDURAL_TEXT_BOUND_PADDING;
+}
+
+float2 proceduralTextDotPosition(
+    Dot2d dot,
+    float2 origin,
+    float2 scale,
+    float2 pivot,
+    float sinAngle,
+    float cosAngle,
+    float sinXAngle,
+    float cosXAngle)
+{
     float2 localPos = dot.position * scale;
-    float2 pivot = scale * 0.5;
-    localPos = proceduralTextRotate2D(localPos - pivot, angle) + pivot;
+    float2 centered = localPos - pivot;
+    float3 tilted = float3(centered.x, centered.y * cosXAngle, centered.y * sinXAngle);
+    float2 rotated = float2(
+        cosAngle * tilted.x - sinAngle * tilted.y,
+        sinAngle * tilted.x + cosAngle * tilted.y
+    );
+    float focal = max(PROCEDURAL_TEXT_PERSPECTIVE, 0.0001);
+    float perspective = focal / max(focal + tilted.z, focal * 0.25);
 
-    return text.position.xy + character.position.xy + offset + localPos;
+    return origin + pivot + rotated * perspective;
 }
 
 float sdProceduralTextStroke(float2 p, float2 a, float2 b, float curvature, float radius)
@@ -174,46 +237,64 @@ float sdProceduralText2D(float2 p, float radius, float time, out float4 color)
     int textCount = min(max(_TextCount, 0), PROCEDURAL_TEXT_MAX_TEXTS);
 
     [loop]
-    for (int textIndex = 0; textIndex < PROCEDURAL_TEXT_MAX_TEXTS; textIndex++)
+    for (int textIndex = 0; textIndex < textCount; textIndex++)
     {
-        if (textIndex >= textCount) break;
-
         Text text = _TextBuffer[textIndex];
         int charStart = clamp(text.charOffset, 0, max(_CharacterCount, 0));
         int charEnd = min(charStart + max(text.charCount, 0), _CharacterCount);
         int charLimit = min(charEnd - charStart, PROCEDURAL_TEXT_MAX_CHARS);
 
         [loop]
-        for (int charLocalIndex = 0; charLocalIndex < PROCEDURAL_TEXT_MAX_CHARS; charLocalIndex++)
+        for (int charLocalIndex = 0; charLocalIndex < charLimit; charLocalIndex++)
         {
-            if (charLocalIndex >= charLimit) break;
-
             int charIndex = charStart + charLocalIndex;
             Character character = _CharacterBuffer[charIndex];
-            float charAngle = 2 * proceduralTextCharacterAngle(textIndex, charIndex, character, time);
             float2 characterOffset = 50 * proceduralTextCharacterOffset(textIndex, charIndex, character, time);
             int dotStart = clamp(character.dotOffset, 0, max(_DotCount, 0));
             int dotEnd = min(dotStart + max(character.dotCount, 0), _DotCount);
             int segmentLimit = min(max(dotEnd - dotStart - 1, 0), PROCEDURAL_TEXT_MAX_DOTS_PER_CHAR);
+            if (segmentLimit <= 0) continue;
+
+            float2 scale = proceduralTextCharacterScale(character);
+            float2 pivot = scale * 0.5;
+            float2 origin = text.position.xy + character.position.xy + characterOffset;
+            float boundD = length(p - (origin + pivot)) - proceduralTextCharacterBoundRadius(scale, radius);
+            if (boundD >= minD) continue;
+            if (boundD > PROCEDURAL_TEXT_DETAIL_BAND)
+            {
+                minD = boundD;
+                continue;
+            }
+
+            float charAngle = 2 * proceduralTextCharacterAngle(textIndex, charIndex, character, time);
+            float charXAngle = proceduralTextCharacterXAngle(textIndex, charIndex, character, time);
+            float sinAngle;
+            float cosAngle;
+            float sinXAngle;
+            float cosXAngle;
+            sincos(charAngle, sinAngle, cosAngle);
+            sincos(charXAngle, sinXAngle, cosXAngle);
+            Dot2d aDot = _DotBuffer[dotStart];
+            float2 posA = proceduralTextDotPosition(aDot, origin, scale, pivot, sinAngle, cosAngle, sinXAngle, cosXAngle);
 
             [loop]
-            for (int segmentIndex = 0; segmentIndex < PROCEDURAL_TEXT_MAX_DOTS_PER_CHAR; segmentIndex++)
+            for (int segmentIndex = 0; segmentIndex < segmentLimit; segmentIndex++)
             {
-                if (segmentIndex >= segmentLimit) break;
-
-                Dot2d aDot = _DotBuffer[dotStart + segmentIndex];
-                if (aDot.startOfNext == 0) continue;
-
                 Dot2d bDot = _DotBuffer[dotStart + segmentIndex + 1];
-                float2 posA = proceduralTextDotPosition(aDot, character, text, charAngle, characterOffset);
-                float2 posB = proceduralTextDotPosition(bDot, character, text, charAngle, characterOffset);
-                float d  = sdProceduralTextStroke(p, posA, posB, aDot.curvature, radius);
-
-                if (d < minD)
+                float2 posB = proceduralTextDotPosition(bDot, origin, scale, pivot, sinAngle, cosAngle, sinXAngle, cosXAngle);
+                if (aDot.startOfNext != 0)
                 {
-                    minD = d;
-                    color = proceduralTextStrokeColor(aDot, bDot);
+                    float d  = sdProceduralTextStroke(p, posA, posB, aDot.curvature, radius);
+
+                    if (d < minD)
+                    {
+                        minD = d;
+                        color = proceduralTextStrokeColor(aDot, bDot);
+                    }
                 }
+
+                aDot = bDot;
+                posA = posB;
             }
         }
     }
