@@ -3,6 +3,10 @@ Shader "Unlit/Gyroids"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        _Palette_A ("Palette_A", Vector) = (0.45, 0.45, 0.45)
+        _Palette_B ("Palette_B", Vector) = (0.35, 0.35, 0.35)
+        _Palette_C ("Palette_C", Vector) = (1, 1, 1, 1)
+        _Palette_D ("Palette_D", Vector) = (0.7, 0.39, 0.2)
     }
     SubShader
     {
@@ -34,12 +38,18 @@ Shader "Unlit/Gyroids"
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
+            float3 _Palette_A;
+            float3 _Palette_B;
+            float3 _Palette_C;
+            float3 _Palette_D;
 
             // based on https://iquilezles.org/articles/palettes/
             float3 pal(float t) {
-                float3 b = .45;
-                float3 c = .35;
-                return b + c*cos(6.28318*(t*1+float3(.7,.39, .2)));
+                float3 a = _Palette_A;
+                float3 b = _Palette_B;
+                float3 c = _Palette_C;
+                float3 d = _Palette_D;
+                return a+b*cos(UNITY_TWO_PI*(c*t+d));
             }
 
             // see https://www.youtube.com/watch?v=-adHIyjIYgk
@@ -90,7 +100,7 @@ Shader "Unlit/Gyroids"
                 float ao = 1.-smoothstep(-.3,.75,scene(p+n*.4))
                          * smoothstep(-3.,3.,scene(p+n*1.));
                 
-                float fres = -max(0., pow(.8-abs(dot(cam,n)), 3.));
+                float  fres = -max(0., pow(.8-abs(dot(cam,n)), 3.));
                 float3 vign = smoothstep(0.,1.,1.-(length(uv*.8)-.1));
                 float3 col = pal(.1-_Time.y*.01 + p.x*.28 + p.y*.2 + p.z*.2);
                 col = (fres+col)*ao;

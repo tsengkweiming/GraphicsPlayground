@@ -101,6 +101,7 @@ Shader "Hidden/Procedural/Hatch Pattern Image"
 
             float2 HatchSourceUv(float2 canvasUv)
             {
+                // Convert p5-style top-left canvas UVs back to Unity's bottom-left texture UVs.
                 float2 sourceUv = float2(canvasUv.x, 1.0 - canvasUv.y);
                 sourceUv = sourceUv * _BaseMap_ST.xy + _BaseMap_ST.zw;
                 sourceUv.y = lerp(sourceUv.y, 1.0 - sourceUv.y, step(0.5, _FlipSourceY));
@@ -118,8 +119,10 @@ Shader "Hidden/Procedural/Hatch Pattern Image"
                 float validCell = HatchCellIsValid(cellId, gridSize);
 
                 float2 localUv = uv * gridSize - cellId;
+                // Inverse-rotate the fragment into the cell's hatch-space, matching p5 push/rotate/draw.
                 localUv = HatchRotate2D(localUv - 0.5, -angleRadians) + 0.5;
 
+                // The source image is sampled once at the cell center, just like the p5 loop.
                 float2 cellSampleUv = HatchSourceUv(HatchCellCenterUv(cellId, gridSize));
                 half3 sourceColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, saturate(cellSampleUv)).rgb;
 
@@ -150,6 +153,7 @@ Shader "Hidden/Procedural/Hatch Pattern Image"
                     [unroll]
                     for (int y = -1; y <= 1; y++)
                     {
+                        // Rotated p5 strokes can extend past their own cell, so evaluate neighbors too.
                         float2 cellId = baseCellId + float2((float)x, (float)y);
                         HatchEvaluateLayer(uv, cellId, gridSize, angleRadians, strokeWidthCell, color);
                     }
