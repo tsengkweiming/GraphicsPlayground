@@ -12,6 +12,7 @@ float2 HatchRotate2D(float2 pos, float radians)
     float s;
     float c;
     sincos(radians, s, c);
+    // Standard 2D rotation matrix, used around each hatch cell center.
     return float2(c * pos.x - s * pos.y, s * pos.x + c * pos.y);
 }
 
@@ -22,6 +23,7 @@ float3 HatchLinearToSRGB(float3 color)
 #if defined(UNITY_COLORSPACE_GAMMA)
     return color;
 #else
+    // p5 brightness works on display-space RGB; convert Unity linear samples first.
     float3 low = color * 12.92;
     float3 high = 1.055 * pow(max(color, 0.0), 1.0 / 2.4) - 0.055;
     return lerp(low, high, step(0.0031308, color));
@@ -33,6 +35,7 @@ float HatchSegmentDistance(float2 pos, float2 startPos, float2 endPos)
     float2 toPos = pos - startPos;
     float2 segment = endPos - startPos;
     float segmentLengthSq = max(dot(segment, segment), 0.00001);
+    // Project the fragment onto the finite line segment, then measure nearest distance.
     float projection = saturate(dot(toPos, segment) / segmentLengthSq);
     return length(toPos - segment * projection);
 }
@@ -40,6 +43,7 @@ float HatchSegmentDistance(float2 pos, float2 startPos, float2 endPos)
 float HatchStrokeCoverage(float distanceToStroke, float strokeWidthCell, float softness)
 {
     float halfWidth = max(strokeWidthCell * 0.5, 0.0001);
+    // fwidth gives screen-space derivatives, keeping stroke edges stable under zoom.
     float aa = max(fwidth(distanceToStroke) * max(softness, 0.0001), 0.0001);
     return 1.0 - smoothstep(halfWidth - aa, halfWidth + aa, distanceToStroke);
 }
@@ -52,11 +56,13 @@ float HatchLineCoverage(float2 pos, float2 startPos, float2 endPos, float stroke
 
 float HatchUnion(float a, float b)
 {
+    // Probabilistic union avoids over-bright intersections while staying branchless.
     return saturate(a + b - a * b);
 }
 
 float HatchPatternMask(float2 localUv, float patternIndex, float strokeWidthCell, float softness)
 {
+    // All primitives are drawn in normalized cell space, matching the p5 line calls.
     float vertical = HatchLineCoverage(localUv, float2(0.5, 0.0), float2(0.5, 1.0), strokeWidthCell, softness);
     float horizontal = HatchLineCoverage(localUv, float2(0.0, 0.5), float2(1.0, 0.5), strokeWidthCell, softness);
     float diagonalForward = HatchLineCoverage(localUv, float2(0.0, 0.0), float2(1.0, 1.0), strokeWidthCell, softness);
@@ -78,6 +84,7 @@ float HatchPatternMask(float2 localUv, float patternIndex, float strokeWidthCell
 
 float HatchP5Brightness(float3 unityRgb, float brightnessLift)
 {
+    // The p5 alpha slider was added to RGB before brightness quantization.
     float3 p5Rgb = saturate(HatchLinearToSRGB(unityRgb) + brightnessLift);
     return max(max(p5Rgb.r, p5Rgb.g), p5Rgb.b);
 }
@@ -86,6 +93,7 @@ float HatchQuantizeDarkness(float brightness, float divisions)
 {
     float divs = clamp(floor(divisions + 0.5), 1.0, 4.0);
     float darkness = saturate(1.0 - brightness);
+    // p5 used floor((1.0 - brightness) * divs) to choose the hatch pattern.
     return min(floor(darkness * divs), divs - 1.0);
 }
 
@@ -93,12 +101,14 @@ float2 HatchGridFromColumns(float columns, float canvasAspect)
 {
     float safeColumns = max(columns, 1.0);
     float safeAspect = max(canvasAspect, 0.0001);
+    // p5 set rows = columns / (width / height), preserving square-ish cells.
     return float2(safeColumns, safeColumns / safeAspect);
 }
 
 float HatchStrokeWidthInCell(float strokeWeightPixels, float referenceWidth, float columns)
 {
     float cellPixels = max(referenceWidth / max(columns, 1.0), 0.0001);
+    // Convert p5 pixel strokeWeight into normalized cell units.
     return max(strokeWeightPixels / cellPixels, 0.0001);
 }
 
@@ -122,6 +132,7 @@ float3 HatchPaletteColor(
     float3 color3)
 {
     float4 pattern = float4(patternIndex, patternIndex, patternIndex, patternIndex);
+    // One-hot palette selection keeps this usable on fragment targets without branches.
     float4 pick = 1.0 - step(0.5, abs(pattern - float4(0.0, 1.0, 2.0, 3.0)));
     return color0 * pick.x + color1 * pick.y + color2 * pick.z + color3 * pick.w;
 }
