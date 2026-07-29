@@ -1,77 +1,80 @@
 using UnityEngine;
 
 [System.Serializable]
-public class GyroidControllerParam
+public class GyroidControllerParam : ShaderControllerParam<GyroidControllerParam>
 {
-    [Range(0, 4)] public float PatternMode;
-    [Range(0, 1)] public float ShapeBlend;
-    [Range(0, 12)] public float Scale = 4;
-    [Range(0, 2)] public float Warp;
-    public float Thickness = 0.1f;
-    public float Twist;
-    [Range(0, 4)] public float ColorMode = 1;
-    [Range(0.05f, 3)] public float ColorFrequency = 1;
-    [Range(0, 2)] public float ColorContrast = 1;
+    [Range(0, 4)] public float patternMode;
+    [Range(0, 1)] public float shapeBlend;
+    [Range(0, 12)] public float scale = 4;
+    [Range(0, 2)] public float warp;
+    public float thickness = 0.1f;
+    public float twist;
+    [Range(0, 4)] public float colorMode = 1;
+    [Range(0.05f, 3)] public float colorFrequency = 1;
+    [Range(0, 2)] public float colorContrast = 1;
+    public float moveTime = 0.25f;
 
-    public void CopyFrom(GyroidControllerParam other)
+    public override void CopyFrom(GyroidControllerParam other)
     {
         if (other == null)
         {
             return;
         }
 
-        PatternMode = other.PatternMode;
-        ShapeBlend = other.ShapeBlend;
-        Scale = other.Scale;
-        Warp = other.Warp;
-        Thickness = other.Thickness;
-        Twist = other.Twist;
-        ColorMode = other.ColorMode;
-        ColorFrequency = other.ColorFrequency;
-        ColorContrast = other.ColorContrast;
+        patternMode = other.patternMode;
+        shapeBlend = other.shapeBlend;
+        scale = other.scale;
+        warp = other.warp;
+        thickness = other.thickness;
+        twist = other.twist;
+        colorMode = other.colorMode;
+        colorFrequency = other.colorFrequency;
+        colorContrast = other.colorContrast;
+        moveTime = other.moveTime;
     }
 
-    public void MoveTowards(GyroidControllerParam target, float maxDelta)
+    public override void MoveTowards(GyroidControllerParam target, float t)
     {
         if (target == null)
         {
             return;
         }
 
-        PatternMode = Mathf.MoveTowards(PatternMode, target.PatternMode, maxDelta);
-        ShapeBlend = Mathf.MoveTowards(ShapeBlend, target.ShapeBlend, maxDelta);
-        Scale = Mathf.MoveTowards(Scale, target.Scale, maxDelta);
-        Warp = Mathf.MoveTowards(Warp, target.Warp, maxDelta);
-        Thickness = Mathf.MoveTowards(Thickness, target.Thickness, maxDelta);
-        Twist = Mathf.MoveTowards(Twist, target.Twist, maxDelta);
-        ColorMode = Mathf.MoveTowards(ColorMode, target.ColorMode, maxDelta);
-        ColorFrequency = Mathf.MoveTowards(ColorFrequency, target.ColorFrequency, maxDelta);
-        ColorContrast = Mathf.MoveTowards(ColorContrast, target.ColorContrast, maxDelta);
+        patternMode = LerpValue(patternMode, target.patternMode, t);
+        shapeBlend = LerpValue(shapeBlend, target.shapeBlend, t);
+        scale = LerpValue(scale, target.scale, t);
+        warp = LerpValue(warp, target.warp, t);
+        thickness = LerpValue(thickness, target.thickness, t);
+        twist = LerpValue(twist, target.twist, t);
+        colorMode = LerpValue(colorMode, target.colorMode, t);
+        colorFrequency = LerpValue(colorFrequency, target.colorFrequency, t);
+        colorContrast = LerpValue(colorContrast, target.colorContrast, t);
+        moveTime = LerpValue(moveTime, target.moveTime, t);
     }
 
-    public bool Approximately(GyroidControllerParam other)
+    public override bool Approximately(GyroidControllerParam other)
     {
         if (other == null)
         {
             return false;
         }
 
-        return Mathf.Approximately(PatternMode, other.PatternMode)
-            && Mathf.Approximately(ShapeBlend, other.ShapeBlend)
-            && Mathf.Approximately(Scale, other.Scale)
-            && Mathf.Approximately(Warp, other.Warp)
-            && Mathf.Approximately(Thickness, other.Thickness)
-            && Mathf.Approximately(Twist, other.Twist)
-            && Mathf.Approximately(ColorMode, other.ColorMode)
-            && Mathf.Approximately(ColorFrequency, other.ColorFrequency)
-            && Mathf.Approximately(ColorContrast, other.ColorContrast);
+        return ApproximatelyValue(patternMode, other.patternMode)
+            && ApproximatelyValue(shapeBlend, other.shapeBlend)
+            && ApproximatelyValue(scale, other.scale)
+            && ApproximatelyValue(warp, other.warp)
+            && ApproximatelyValue(thickness, other.thickness)
+            && ApproximatelyValue(twist, other.twist)
+            && ApproximatelyValue(colorMode, other.colorMode)
+            && ApproximatelyValue(colorFrequency, other.colorFrequency)
+            && ApproximatelyValue(colorContrast, other.colorContrast)
+            && ApproximatelyValue(moveTime, other.moveTime);
     }
 }
 
 public class GyroidController : ShaderController
 {
     [SerializeField] private GyroidControllerParam _param;
-    [SerializeField] private float _interpolationSpeed = 2f;
 
     private static readonly int PatternModeId = Shader.PropertyToID("_PatternMode");
     private static readonly int ShapeBlendId = Shader.PropertyToID("_ShapeBlend");
@@ -82,6 +85,7 @@ public class GyroidController : ShaderController
     private static readonly int ColorModeId = Shader.PropertyToID("_ColorMode");
     private static readonly int ColorFrequencyId = Shader.PropertyToID("_ColorFrequency");
     private static readonly int ColorContrastId = Shader.PropertyToID("_ColorContrast");
+    private static readonly int MoveTimeId = Shader.PropertyToID("_MoveTime");
 
     private readonly GyroidControllerParam _currentParam = new GyroidControllerParam();
     private double _lastEditorTime;
@@ -142,15 +146,16 @@ public class GyroidController : ShaderController
             return;
         }
 
-        _material.SetFloat(PatternModeId, param.PatternMode);
-        _material.SetFloat(ShapeBlendId, param.ShapeBlend);
-        _material.SetFloat(ScaleId, param.Scale);
-        _material.SetFloat(WarpId, param.Warp);
-        _material.SetFloat(ThicknessId, param.Thickness);
-        _material.SetFloat(TwistId, param.Twist);
-        _material.SetFloat(ColorModeId, param.ColorMode);
-        _material.SetFloat(ColorFrequencyId, param.ColorFrequency);
-        _material.SetFloat(ColorContrastId, param.ColorContrast);
+        _material.SetFloat(PatternModeId, param.patternMode);
+        _material.SetFloat(ShapeBlendId, param.shapeBlend);
+        _material.SetFloat(ScaleId, param.scale);
+        _material.SetFloat(WarpId, param.warp);
+        _material.SetFloat(ThicknessId, param.thickness);
+        _material.SetFloat(TwistId, param.twist);
+        _material.SetFloat(ColorModeId, param.colorMode);
+        _material.SetFloat(ColorFrequencyId, param.colorFrequency);
+        _material.SetFloat(ColorContrastId, param.colorContrast);
+        _material.SetFloat(MoveTimeId, param.moveTime);
     }
 
     private float GetDeltaTime()

@@ -7,7 +7,7 @@ Shader "Unlit/PrismDream"
         _PatternBlend ("Pattern Blend", Range(0, 1)) = 0
         _RepeatScale ("Repeat Scale", Range(0.25, 4)) = 1.15
         _WarpStrength ("Warp Strength", Range(0, 2)) = 0.55
-        _PrismRadius ("Shape Radius", Range(0.5, 5)) = 3.5
+        _PrismRadius ("Shape Radius", Range(0, 5)) = 3.5
         _StepScale ("March Step Scale", Range(0.1, 1.5)) = 0.85
         _ColorSpread ("Color Spread", Range(0.1, 4)) = 1.2
         _Exposure ("Exposure", Range(0.1, 5)) = 1
