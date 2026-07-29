@@ -173,7 +173,9 @@ public class ProceduralTextGIController : MonoBehaviour
     private int               _frameCount = 0;
     private int               _kernel     = -1;
     private readonly TextGIParam _currentTextGIParam = new();
-
+    
+    public TextGIParam TextGIParam {get => _textGIParam; set  => _textGIParam = value; }
+    
     public static bool TryGetForCamera(Camera camera, out ProceduralTextGIController controller)
     {
         if (camera != null &&
@@ -408,7 +410,6 @@ public class ProceduralTextGIController : MonoBehaviour
     }
 
     // ─── RT helpers ───────────────────────────────────────────────────────────
-
     private void InitRTs(int w, int h)
     {
         for (int i = 0; i < 2; i++)

@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: de640fe3d0db1804a85f9fc8f5cadab6, type: 3}
   m_Name: PC_Renderer
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   debugShaders:
     debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7, type: 3}
     hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
@@ -26,10 +26,11 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: 7833122117494664109}
+  - {fileID: 6814368194108194073}
   - {fileID: 10130517536383193}
   - {fileID: 2478092024809630951}
   - {fileID: 5542605408351618268}
-  m_RendererFeatureMap: ad6b866f10d7b46cd9a025eba6fd2300e7ac812b91f36322dc04f5be404aeb4c
+  m_RendererFeatureMap: ad6b866f10d7b46c19fd89bac47f915ed9a025eba6fd2300e7ac812b91f36322dc04f5be404aeb4c
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -55,6 +56,20 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &6814368194108194073
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c4d733e6d1f4ee2a9db5ba6f1606320, type: 3}
+  m_Name: ProceduralTextGIRendererFeature
+  m_EditorClassIdentifier:
+  m_Active: 1
+  _renderPassEvent: 550
 --- !u!114 &10130517536383193
 MonoBehaviour:
   m_ObjectHideFlags: 0

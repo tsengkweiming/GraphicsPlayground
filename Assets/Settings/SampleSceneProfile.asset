@@ -270,19 +270,19 @@ MonoBehaviour:
     m_Value: 0
   monoFactor:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 0.407
   pixel:
     m_OverrideState: 1
-    m_Value: 374
+    m_Value: 375
   color:
     m_OverrideState: 1
-    m_Value: 4
+    m_Value: 3.09
   ditherStrength:
     m_OverrideState: 1
-    m_Value: 0.01
+    m_Value: 0.37
   maskCount:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 2
   paletteColor0:
     m_OverrideState: 1
     m_Value: {r: 0.384, g: 0.776, b: 0.949, a: 1}
