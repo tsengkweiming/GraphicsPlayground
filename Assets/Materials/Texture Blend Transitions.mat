@@ -34,8 +34,8 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BlendAmount: 0.5
-    - _BlendMode: 0
+    - _BlendAmount: 0.604
+    - _BlendMode: 3.73
     - _Distortion: 0.2
     - _InvertTransition: 0
     - _NoiseScale: 2

@@ -2,18 +2,31 @@ Shader "Hidden/ASCII Art"
 {
     Properties
     {
-        [MainTexture] _ReferenceImage ("Reference Image", 2D) = "white" {}
+        [MainTexture] _MainTex ("Reference Image", 2D) = "white" {}
 
         // SVG Pattern Textures for different brightness levels
-        _SVGPattern0 ("SVG Pattern 0 (Darkest)", 2D) = "white" {}
-        _SVGPattern1 ("SVG Pattern 1", 2D) = "white" {}
-        _SVGPattern2 ("SVG Pattern 2", 2D) = "white" {}
-        _SVGPattern3 ("SVG Pattern 3", 2D) = "white" {}
-        _SVGPattern4 ("SVG Pattern 4 (Brightest)", 2D) = "white" {}
+        _Pattern0 ("Pattern 0 (Darkest)", 2D) = "white" {}
+        _Pattern1 ("Pattern 1", 2D) = "white" {}
+        _Pattern2 ("Pattern 2", 2D) = "white" {}
+        _Pattern3 ("Pattern 3", 2D) = "white" {}
+        _Pattern4 ("Pattern 4 (Brightest)", 2D) = "white" {}
 
         _BackgroundColor ("Background Color", Color) = (1, 1, 1, 1)
         _Resolution ("Resolution (Grid Columns)", Range(10, 150)) = 59
         _PosterizeLevels ("Posterize Levels", Range(-2, 50)) = 5
+
+        // --- Tonal range controls (stretch image luminance into full pattern range) ---
+        _InputBlack ("Input Black Point", Range(0, 1)) = 0
+        _InputWhite ("Input White Point", Range(0, 1)) = 1
+        _Gamma ("Gamma", Range(0.1, 5)) = 1
+        _Contrast ("Contrast", Range(0, 4)) = 1
+        _Brightness ("Brightness", Range(-1, 1)) = 0
+        [Toggle] _InvertLuma ("Invert Luminance", Float) = 0
+
+        // --- HSV Color shift ---
+        _HueShift ("Hue Shift", Range(0, 1)) = 0
+        _Saturation ("Saturation", Range(0, 2)) = 1
+        _Value ("Value (Brightness)", Range(0, 2)) = 1
     }
 
     SubShader
@@ -36,8 +49,8 @@ Shader "Hidden/ASCII Art"
 
             HLSLPROGRAM
             #pragma target 3.5
-            #pragma vertex FlowerASCIIVertex
-            #pragma fragment FlowerASCIIFragment
+            #pragma vertex Vertex
+            #pragma fragment Fragment
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -57,33 +70,42 @@ Shader "Hidden/ASCII Art"
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            TEXTURE2D(_ReferenceImage);
-            SAMPLER(sampler_ReferenceImage);
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
 
-            TEXTURE2D(_SVGPattern0);
-            SAMPLER(sampler_SVGPattern0);
-            TEXTURE2D(_SVGPattern1);
-            SAMPLER(sampler_SVGPattern1);
-            TEXTURE2D(_SVGPattern2);
-            SAMPLER(sampler_SVGPattern2);
-            TEXTURE2D(_SVGPattern3);
-            SAMPLER(sampler_SVGPattern3);
-            TEXTURE2D(_SVGPattern4);
-            SAMPLER(sampler_SVGPattern4);
+            TEXTURE2D(_Pattern0);
+            SAMPLER(sampler_Pattern0);
+            TEXTURE2D(_Pattern1);
+            SAMPLER(sampler_Pattern1);
+            TEXTURE2D(_Pattern2);
+            SAMPLER(sampler_Pattern2);
+            TEXTURE2D(_Pattern3);
+            SAMPLER(sampler_Pattern3);
+            TEXTURE2D(_Pattern4);
+            SAMPLER(sampler_Pattern4);
 
             CBUFFER_START(UnityPerMaterial)
-                float4 _ReferenceImage_ST;
-                float4 _SVGPattern0_ST;
-                float4 _SVGPattern1_ST;
-                float4 _SVGPattern2_ST;
-                float4 _SVGPattern3_ST;
-                float4 _SVGPattern4_ST;
+                float4 _MainTex_ST;
+                float4 _Pattern0_ST;
+                float4 _Pattern1_ST;
+                float4 _Pattern2_ST;
+                float4 _Pattern3_ST;
+                float4 _Pattern4_ST;
                 half4 _BackgroundColor;
                 float _Resolution;
                 float _PosterizeLevels;
+                float _InputBlack;
+                float _InputWhite;
+                float _Gamma;
+                float _Contrast;
+                float _Brightness;
+                float _InvertLuma;
+                float _HueShift;
+                float _Saturation;
+                float _Value;
             CBUFFER_END
 
-            Varyings FlowerASCIIVertex(Attributes input)
+            Varyings Vertex(Attributes input)
             {
                 Varyings output = (Varyings)0;
 
@@ -92,8 +114,32 @@ Shader "Hidden/ASCII Art"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                #if UNITY_UV_STARTS_AT_TOP
+		            input.uv.y = 1.0 - input.uv.y;
+                #endif
                 output.uv = input.uv;
                 return output;
+            }
+
+            // Remap raw luminance so the image's usable tonal range fills 0-1.
+            // Stretches [InputBlack, InputWhite] to full range, then applies
+            // gamma, contrast (pivoted around mid-grey) and a brightness offset.
+            float AdjustLuminance(float luma)
+            {
+                // Levels: stretch input range to 0-1 (guard against zero span)
+                float span = max(_InputWhite - _InputBlack, 1e-4);
+                float t = saturate((luma - _InputBlack) / span);
+
+                // Gamma correction
+                t = pow(t, 1.0 / max(_Gamma, 1e-4));
+
+                // Contrast around mid-grey + brightness offset
+                t = saturate((t - 0.5) * _Contrast + 0.5 + _Brightness);
+
+                // Optional inversion (dark subject on light bg vs. reverse)
+                t = lerp(t, 1.0 - t, _InvertLuma);
+
+                return t;
             }
 
             // Posterize function: reduce brightness levels
@@ -103,8 +149,8 @@ Shader "Hidden/ASCII Art"
                 return floor(brightness / step) * step;
             }
 
-            // Map brightness (0-1) to SVG pattern index (0-4)
-            int GetSVGIndex(float brightness, int numPatterns)
+            // Map brightness (0-1) to Pattern index (0-4)
+            int GetIndex(float brightness, int numPatterns)
             {
                 // Invert: darker -> lower index (more detail)
                 float inverted = 1.0 - brightness;
@@ -112,26 +158,56 @@ Shader "Hidden/ASCII Art"
                 return clamp(index, 0, numPatterns - 1);
             }
 
-            // Sample the appropriate SVG pattern based on brightness
-            half3 SampleSVGPattern(float2 uv, int patternIndex)
+            // Sample the appropriate pattern based on brightness
+            half3 SamplePattern(float2 uv, int patternIndex)
             {
                 half3 color = half3(1, 1, 1);
 
                 if (patternIndex == 0)
-                    color = SAMPLE_TEXTURE2D(_SVGPattern0, sampler_SVGPattern0, uv).rgb;
+                    color = SAMPLE_TEXTURE2D(_Pattern0, sampler_Pattern0, uv).rgb;
                 else if (patternIndex == 1)
-                    color = SAMPLE_TEXTURE2D(_SVGPattern1, sampler_SVGPattern1, uv).rgb;
+                    color = SAMPLE_TEXTURE2D(_Pattern1, sampler_Pattern1, uv).rgb;
                 else if (patternIndex == 2)
-                    color = SAMPLE_TEXTURE2D(_SVGPattern2, sampler_SVGPattern2, uv).rgb;
+                    color = SAMPLE_TEXTURE2D(_Pattern2, sampler_Pattern2, uv).rgb;
                 else if (patternIndex == 3)
-                    color = SAMPLE_TEXTURE2D(_SVGPattern3, sampler_SVGPattern3, uv).rgb;
+                    color = SAMPLE_TEXTURE2D(_Pattern3, sampler_Pattern3, uv).rgb;
                 else
-                    color = SAMPLE_TEXTURE2D(_SVGPattern4, sampler_SVGPattern4, uv).rgb;
+                    color = SAMPLE_TEXTURE2D(_Pattern4, sampler_Pattern4, uv).rgb;
 
                 return color;
             }
 
-            half4 FlowerASCIIFragment(Varyings input) : SV_Target
+            // RGB to HSV conversion
+            float3 RgbToHsv(float3 c)
+            {
+                float4 K = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+                float4 p = lerp(float4(c.bg, K.wz), float4(c.gb, K.xy), step(c.b, c.g));
+                float4 q = lerp(float4(p.xyw, c.r), float4(c.r, p.yzx), step(p.x, c.r));
+
+                float d = q.x - min(q.w, q.y);
+                float e = 1.0e-10;
+                return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+            }
+
+            // HSV to RGB conversion
+            float3 HsvToRgb(float3 c)
+            {
+                float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+                float3 p = abs(frac(c.xxx + K.xyz) * 6.0 - K.www);
+                return c.z * lerp(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+            }
+
+            // Apply HSV shift to color
+            half3 ApplyHsvShift(half3 rgb)
+            {
+                float3 hsv = RgbToHsv(rgb);
+                hsv.x = frac(hsv.x + _HueShift);
+                hsv.y = saturate(hsv.y * _Saturation);
+                hsv.z = saturate(hsv.z * _Value);
+                return HsvToRgb(hsv);
+            }
+            
+            half4 Fragment(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -151,23 +227,28 @@ Shader "Hidden/ASCII Art"
                 // Sample reference image at cell center (like p5 loop)
                 float2 cellCenterUv = (cellId + 0.5) / float2(cols, rows);
                 // Convert back to standard UV for texture sampling
-                float2 refUv = float2(cellCenterUv.x, 1.0 - cellCenterUv.y);
-                refUv = refUv * _ReferenceImage_ST.xy + _ReferenceImage_ST.zw;
+                float2 refUv = float2(cellCenterUv.x, cellCenterUv.y);
+                refUv = refUv * _MainTex_ST.xy + _MainTex_ST.zw;
 
-                half3 refColor = SAMPLE_TEXTURE2D(_ReferenceImage, sampler_ReferenceImage, saturate(refUv)).rgb;
+                half3 refColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(refUv)).rgb;
 
                 // Calculate brightness (0-1)
                 float brightness = dot(refColor, float3(0.299, 0.587, 0.114));
 
+                // Remap tonal range so more of the pattern set is used
+                brightness = AdjustLuminance(brightness);
+
                 // Posterize brightness
                 float posterized = Posterize(brightness, _PosterizeLevels);
 
-                // Map to SVG pattern index
-                int svgIndex = GetSVGIndex(posterized, 5);
+                // Map to Pattern index
+                int imgIndex = GetIndex(posterized, 5);
 
-                // Sample the appropriate SVG pattern
-                half3 result = SampleSVGPattern(cellUv, svgIndex);
+                // Sample the appropriate Pattern
+                half3 result = SamplePattern(cellUv, imgIndex);
 
+                // Apply HSV shift
+                result = ApplyHsvShift(result);
                 return half4(result, _BackgroundColor.a);
             }
             ENDHLSL

@@ -5,7 +5,7 @@ Shader "Hidden/Texture Blend Transitions"
         _TextureA ("Texture A", 2D) = "white" {}
         _TextureB ("Texture B", 2D) = "white" {}
 
-        _BlendMode ("Blend Mode", Range(0, 7)) = 0
+        _BlendMode ("Blend Mode", Range(0, 9)) = 0
         _BlendAmount ("Blend Amount (0-1)", Range(0, 1)) = 0.5
         _TransitionSpeed ("Transition Speed", Range(0.1, 5)) = 1.0
         _NoiseScale ("Noise/Pattern Scale", Range(0.1, 10)) = 2.0
@@ -90,7 +90,6 @@ Shader "Hidden/Texture Blend Transitions"
             // NOISE & PATTERN GENERATORS
             // ─────────────────────────────────────────────────────
 
-            // 2D Perlin-like noise (simplified)
             float Hash2D(float2 p)
             {
                 float3 p3 = frac(float3(p.xyx) * 0.13);
@@ -102,7 +101,7 @@ Shader "Hidden/Texture Blend Transitions"
             {
                 float2 i = floor(uv);
                 float2 f = frac(uv);
-                f = f * f * (3.0 - 2.0 * f); // Smooth interpolation
+                f = f * f * (3.0 - 2.0 * f);
 
                 float n00 = Hash2D(i + float2(0, 0));
                 float n10 = Hash2D(i + float2(1, 0));
@@ -113,7 +112,7 @@ Shader "Hidden/Texture Blend Transitions"
                 float nx1 = lerp(n01, n11, f.x);
                 return lerp(nx0, nx1, f.y);
             }
-
+            
             // Fractal Brownian Motion (FBM)
             float FBM(float2 uv, int octaves)
             {
@@ -221,6 +220,31 @@ Shader "Hidden/Texture Blend Transitions"
                 return frac(combined);
             }
 
+            // 9. Pixel scatter transition (hash-based per-cell reveal)
+            float TransitionPixelScatter(float2 uv, float t)
+            {
+                // Divide UV into a grid (scale by _NoiseScale for grid density)
+                // _NoiseScale controls cell size: higher = larger cells = coarser scatter
+                float gridScale = _NoiseScale * 8.0; // typical range 8-80 cells across
+                float2 cell = floor(uv * gridScale);
+
+                // Hash the cell to get per-block threshold [0,1]
+                float cellHash = Hash2D(cell + float2(13.7, 5.3));
+
+                // Soften the scatter with subtle noise
+                float softNoise = Noise2D(uv * gridScale) * 0.04;
+
+                // Compare progress against per-cell threshold
+                // step() creates hard scatter, add softness with smoothstep if desired
+                float scatter = step(cellHash, t + softNoise);
+
+                // Optional: fade scattered pixels in/out smoothly
+                // Uncomment for softer edge (costs more but smoother):
+                scatter = smoothstep(cellHash - 0.03, cellHash + 0.03, t + softNoise);
+
+                return scatter;
+            }
+
             // ─────────────────────────────────────────────────────
             // DISTORTION EFFECTS
             // ─────────────────────────────────────────────────────
@@ -276,6 +300,8 @@ Shader "Hidden/Texture Blend Transitions"
                     mask = TransitionWave(uv, t);
                 else if (mode == 7)
                     mask = TransitionFractal(uv, t);
+                else if (mode == 8)
+                    mask = TransitionPixelScatter(uv, t);
 
                 // Blend textures
                 half3 result = lerp(colorA, colorB, saturate(mask));

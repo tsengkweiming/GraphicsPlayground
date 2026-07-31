@@ -1,16 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// Inspector-based controller for texture blend transitions.
-/// Adjust all parameters directly in Inspector.
+/// RenderTexture-based controller for texture blend transitions.
+/// Blits transition shader to RenderTexture, outputs result to targetRenderer.
+/// Allows post-processing and off-screen rendering.
 /// </summary>
-public class TextureTransitionController : MonoBehaviour
+public class TextureTransitionController : ShaderController
 {
     [SerializeField] private Renderer targetRenderer;
     [SerializeField] private Texture2D[] textureSequence;
 
     [Header("Transition Settings")]
-    [SerializeField] [Range(0, 7)] private int transitionMode = 0;
+    [SerializeField] [Range(0, 9)] private int transitionMode = 0;
     [SerializeField] [Range(0, 1)] private float blendAmount = 0.5f;
     [SerializeField] [Range(0.1f, 5f)] private float transitionSpeed = 1.0f;
     [SerializeField] private bool useTimeAuto = false;
@@ -26,7 +27,6 @@ public class TextureTransitionController : MonoBehaviour
     [SerializeField] [Range(0.01f, 0.2f)] private float sdfThickness = 0.05f;
     [SerializeField] [Range(0.001f, 0.1f)] private float sdfSmoothing = 0.02f;
 
-    private Material transitionMaterial;
     private int currentTextureIndex = 0;
     private int nextTextureIndex = 1;
     private float textureChangeTimer = 0f;
@@ -36,7 +36,6 @@ public class TextureTransitionController : MonoBehaviour
         if (targetRenderer == null)
             targetRenderer = GetComponent<Renderer>();
 
-        transitionMaterial = targetRenderer.material;
         InitializeTextures();
     }
 
@@ -44,7 +43,7 @@ public class TextureTransitionController : MonoBehaviour
     {
         if (textureSequence == null || textureSequence.Length < 2)
         {
-            Debug.LogError("Need at least 2 textures in sequence!");
+            Debug.LogError("TextureTransitionController: Need at least 2 textures in sequence!");
             return;
         }
 
@@ -53,7 +52,7 @@ public class TextureTransitionController : MonoBehaviour
 
     private void Update()
     {
-        if (transitionMaterial == null || textureSequence == null || textureSequence.Length < 2)
+        if (!_material || textureSequence == null || textureSequence.Length < 2)
             return;
 
         // Auto-advance texture sequence based on transitionSpeed
@@ -67,41 +66,41 @@ public class TextureTransitionController : MonoBehaviour
         }
 
         // Update transition parameters
-        transitionMaterial.SetInt("_BlendMode", transitionMode);
-        transitionMaterial.SetFloat("_BlendAmount", blendAmount);
-        transitionMaterial.SetFloat("_TransitionSpeed", transitionSpeed);
-        transitionMaterial.SetFloat("_UseTime", useTimeAuto ? 1f : 0f);
+        _material.SetInt("_BlendMode", transitionMode);
+        _material.SetFloat("_BlendAmount", blendAmount);
+        _material.SetFloat("_TransitionSpeed", transitionSpeed);
+        _material.SetFloat("_UseTime", useTimeAuto ? 1f : 0f);
 
         // Update noise/pattern parameters
-        transitionMaterial.SetFloat("_NoiseScale", noiseScale);
-        transitionMaterial.SetFloat("_Distortion", distortion);
-        transitionMaterial.SetFloat("_WaveAmplitude", waveAmplitude);
-        transitionMaterial.SetFloat("_WaveFrequency", waveFrequency);
+        _material.SetFloat("_NoiseScale", noiseScale);
+        _material.SetFloat("_Distortion", distortion);
+        _material.SetFloat("_WaveAmplitude", waveAmplitude);
+        _material.SetFloat("_WaveFrequency", waveFrequency);
 
         // Update SDF parameters
-        transitionMaterial.SetFloat("_SDFScale", sdfScale);
-        transitionMaterial.SetFloat("_SDFThickness", sdfThickness);
-        transitionMaterial.SetFloat("_SDFSmoothing", sdfSmoothing);
+        _material.SetFloat("_SDFScale", sdfScale);
+        _material.SetFloat("_SDFThickness", sdfThickness);
+        _material.SetFloat("_SDFSmoothing", sdfSmoothing);
+
+        // Blit to RenderTexture
+        if(blitToRenderTexture)
+            Graphics.Blit(Source, _renderTexture, _material);
     }
 
     private void SetTextureTransition(int fromIdx, int toIdx)
     {
-        if (textureSequence == null || textureSequence.Length < 2)
+        if (textureSequence == null || textureSequence.Length < 2 || _material == null)
             return;
 
         currentTextureIndex = Mathf.Clamp(fromIdx, 0, textureSequence.Length - 1);
         nextTextureIndex = Mathf.Clamp(toIdx, 0, textureSequence.Length - 1);
 
-        transitionMaterial.SetTexture("_TextureA", textureSequence[currentTextureIndex]);
-        transitionMaterial.SetTexture("_TextureB", textureSequence[nextTextureIndex]);
+        _material.SetTexture("_TextureA", textureSequence[currentTextureIndex]);
+        _material.SetTexture("_TextureB", textureSequence[nextTextureIndex]);
 
-        Debug.Log($"Transition: {currentTextureIndex} → {nextTextureIndex}");
+        Debug.Log($"TextureTransitionController: Transition {currentTextureIndex} → {nextTextureIndex}");
     }
 
-    /// <summary>
-    /// Advance to next texture pair in sequence.
-    /// Both currentTextureIndex and nextTextureIndex increment and wrap around.
-    /// </summary>
     public void NextTexture()
     {
         if (textureSequence == null || textureSequence.Length < 2)
@@ -110,16 +109,9 @@ public class TextureTransitionController : MonoBehaviour
         currentTextureIndex = (currentTextureIndex + 1) % textureSequence.Length;
         nextTextureIndex = (nextTextureIndex + 1) % textureSequence.Length;
 
-        transitionMaterial.SetTexture("_TextureA", textureSequence[currentTextureIndex]);
-        transitionMaterial.SetTexture("_TextureB", textureSequence[nextTextureIndex]);
-
-        Debug.Log($"Next: {currentTextureIndex} → {nextTextureIndex}");
+        SetTextureTransition(currentTextureIndex, nextTextureIndex);
     }
 
-    /// <summary>
-    /// Go back to previous texture pair in sequence.
-    /// Both currentTextureIndex and nextTextureIndex decrement and wrap around.
-    /// </summary>
     public void PreviousTexture()
     {
         if (textureSequence == null || textureSequence.Length < 2)
@@ -128,10 +120,13 @@ public class TextureTransitionController : MonoBehaviour
         currentTextureIndex = (currentTextureIndex - 1 + textureSequence.Length) % textureSequence.Length;
         nextTextureIndex = (nextTextureIndex - 1 + textureSequence.Length) % textureSequence.Length;
 
-        transitionMaterial.SetTexture("_TextureA", textureSequence[currentTextureIndex]);
-        transitionMaterial.SetTexture("_TextureB", textureSequence[nextTextureIndex]);
-
-        Debug.Log($"Prev: {currentTextureIndex} → {nextTextureIndex}");
+        SetTextureTransition(currentTextureIndex, nextTextureIndex);
     }
 
+    public void ResizeRenderTexture(int width, int height)
+    {
+        renderTextureSize.x = width;
+        renderTextureSize.y = height;
+        CreateRenderTexture();
+    }
 }

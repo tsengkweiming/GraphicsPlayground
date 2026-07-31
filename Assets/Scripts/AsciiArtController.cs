@@ -4,7 +4,7 @@ using UnityEngine;
 /// Inspector-based controller for Flower ASCII shader parameters.
 /// Adjust all parameters directly in Inspector.
 /// </summary>
-public class FlowerASCIIController : MonoBehaviour
+public class AsciiArtController : ShaderController
 {
     [SerializeField] private Renderer targetRenderer;
 
@@ -49,12 +49,8 @@ public class FlowerASCIIController : MonoBehaviour
 
         // Update flip Y
         shaderMaterial.SetFloat("_FlipY", flipY ? 1f : 0f);
-    }
-
-    public void SaveScreenshot()
-    {
-        string filename = $"FlowerASCII_{System.DateTime.Now:yyyy-MM-dd_HH-mm-ss}.png";
-        ScreenCapture.CaptureScreenshot(filename);
-        Debug.Log($"Screenshot saved: {filename}");
+        
+        if(blitToRenderTexture)
+            Graphics.Blit(Source, _renderTexture, shaderMaterial);
     }
 }

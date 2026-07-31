@@ -23,6 +23,34 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: cf42f7cf27c4307498cb9515d3087a95, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MaintTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern0:
+        m_Texture: {fileID: 2800000, guid: a7e654123a55ab74a8d38c3e80b75063, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern1:
+        m_Texture: {fileID: 2800000, guid: 86e3409dea8fd1f4b8d77f0099a7216e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern2:
+        m_Texture: {fileID: 2800000, guid: c3f46928e52477440a921e1dc69f702c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern3:
+        m_Texture: {fileID: 2800000, guid: 8ed07d570fbf106448735568169f571e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern4:
+        m_Texture: {fileID: 2800000, guid: 0c4886110e1e8734abb5c6b6002508ca, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _ReferenceImage:
         m_Texture: {fileID: 2800000, guid: cf42f7cf27c4307498cb9515d3087a95, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -47,11 +75,30 @@ Material:
         m_Texture: {fileID: 2800000, guid: 0c4886110e1e8734abb5c6b6002508ca, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - __MainTex:
+        m_Texture: {fileID: 2800000, guid: cf42f7cf27c4307498cb9515d3087a95, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _BeatsPerMinute: 120
+    - _BorderRate: 1
+    - _Brightness: 0
+    - _Contrast: 1.8
+    - _Gamma: 1.2
+    - _HueShift: 0.33
+    - _InputBlack: 0
+    - _InputWhite: 1
+    - _InvertLuma: 0
     - _PosterizeLevels: 16.7
     - _Resolution: 150
+    - _Saturation: 0.5
+    - _Size: 0
+    - _Value: 1
+    - _Z: 0
+    - _Z2: 0
     m_Colors:
     - _BackgroundColor: {r: 0, g: 0, b: 0, a: 1}
+    - _BorderColor: {r: 1, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
