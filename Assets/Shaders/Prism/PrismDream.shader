@@ -131,7 +131,7 @@ Shader "Unlit/PrismDream"
 
             float sceneShape(float3 p)
             {
-                float time = _Time.y;
+                float time = _Time.y * 0.3;
                 float radius = max(_PrismRadius, 0.0001);
                 float cellSize = max(1.75, radius * 1.2) / max(_RepeatScale, 0.0001);
 
@@ -176,7 +176,7 @@ Shader "Unlit/PrismDream"
                 for (int i = 0; i < 100; i++)
                 {
                     p = float3(coord, z);
-                    p.xz = rotate2(p.xz, _Time.y + 0.5);
+                    p.xz = rotate2(p.xz, _Time.y * 0.01 + 0.5);
 
                     dist = 0.08 + _StepScale * 0.22 * sceneShape(p);
                     dist = max(abs(dist), 0.002);

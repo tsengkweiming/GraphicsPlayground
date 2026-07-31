@@ -1,4 +1,4 @@
-Shader "Hidden/Procedural/Hatch Pattern Image"
+Shader "Procedural/Hatch Pattern Image"
 {
     Properties
     {
