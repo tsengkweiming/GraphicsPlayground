@@ -12,8 +12,9 @@ Shader "Hidden/ASCII Art"
         _Pattern4 ("Pattern 4 (Brightest)", 2D) = "white" {}
 
         _BackgroundColor ("Background Color", Color) = (1, 1, 1, 1)
-        _Resolution ("Resolution (Grid Columns)", Range(10, 150)) = 59
+        _Resolution ("Resolution (Grid Columns)", Range(10, 350)) = 60
         _PosterizeLevels ("Posterize Levels", Range(-2, 50)) = 5
+        _QuadTreeThreshold ("Quad Tree Variance Threshold", Range(0.0001, 0.01)) = 0.0025
 
         // --- Tonal range controls (stretch image luminance into full pattern range) ---
         _InputBlack ("Input Black Point", Range(0, 1)) = 0
@@ -27,6 +28,11 @@ Shader "Hidden/ASCII Art"
         _HueShift ("Hue Shift", Range(0, 1)) = 0
         _Saturation ("Saturation", Range(0, 2)) = 1
         _Value ("Value (Brightness)", Range(0, 2)) = 1
+        
+        _Threshold ("Variance Threshold", Range(0.0001, 0.01)) = 0.0025
+        _LineColor ("Grid Line Color", Color) = (0.0, 0.0, 0.0, 1.0)
+        _LineWidth ("Grid Line Width (Pixels)", Range(0.1, 4.0)) = 1.0
+        _LineStrength ("Grid Line Strength", Range(0.0, 1.0)) = 1.0
     }
 
     SubShader
@@ -53,7 +59,16 @@ Shader "Hidden/ASCII Art"
             #pragma fragment Fragment
             #pragma multi_compile_instancing
 
+            // Adaptive reference-image sampling. A quad is subdivided when the
+            // estimated RGB variance inside it is above _QuadTreeThreshold.
+            #define ASCII_QUADTREE_MIN_DIVISIONS 4.0
+            #define ASCII_QUADTREE_MAX_ITERATIONS 6
+            #define ASCII_QUADTREE_SAMPLES_PER_ITERATION 30
+            #define ASCII_QUADTREE_F_SAMPLES_PER_ITERATION 30.0
+
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/Common/QuadTree.hlsl"
+            #include "Assets/Packages/CustomPostProcessing/Shaders//Common/OctreeGrid.hlsl"
 
             struct Attributes
             {
@@ -94,6 +109,7 @@ Shader "Hidden/ASCII Art"
                 half4 _BackgroundColor;
                 float _Resolution;
                 float _PosterizeLevels;
+                float _QuadTreeThreshold;
                 float _InputBlack;
                 float _InputWhite;
                 float _Gamma;
@@ -103,6 +119,10 @@ Shader "Hidden/ASCII Art"
                 float _HueShift;
                 float _Saturation;
                 float _Value;
+                float _Threshold;
+                float4 _LineColor;
+                float _LineWidth;
+                float _LineStrength;
             CBUFFER_END
 
             Varyings Vertex(Attributes input)
@@ -114,9 +134,9 @@ Shader "Hidden/ASCII Art"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
-                #if UNITY_UV_STARTS_AT_TOP
-		            input.uv.y = 1.0 - input.uv.y;
-                #endif
+              //   #if UNITY_UV_STARTS_AT_TOP
+		            // input.uv.y = 1.0 - input.uv.y;
+              //   #endif
                 output.uv = input.uv;
                 return output;
             }
@@ -145,9 +165,16 @@ Shader "Hidden/ASCII Art"
             // Posterize function: reduce brightness levels
             float Posterize(float brightness, float levels)
             {
-                float step = 1.0 / levels;
+                float step = 1.0 / max(levels, 1.0);
                 return floor(brightness / step) * step;
             }
+
+            float3 SampleReference(float2 uv)
+            {
+                float2 sampleUv = uv * _MainTex_ST.xy + _MainTex_ST.zw;
+                return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(sampleUv)).rgb;
+            }
+
 
             // Map brightness (0-1) to Pattern index (0-4)
             int GetIndex(float brightness, int numPatterns)
@@ -207,30 +234,81 @@ Shader "Hidden/ASCII Art"
                 return HsvToRgb(hsv);
             }
             
+            float _T;
+            float _Size;
+            float _Z;
+            float _Z2;
+            float _BeatsPerMinute;
+            float _BorderRate;
+            float4 _BorderColor;
+            
+            // Pseudo-random generator based on a seed
+            float random1to1(float seed) {
+                return frac(sin(seed * 12.9898) * 43758.5453);
+            }
+            
+            float gridOutline(float3 p, float3 cellSize, float lineWidth)
+            {
+                float3 localPos = abs(fmod(p + 0.5 * cellSize, cellSize) - 0.5 * cellSize);
+                float3 halfSize = 0.5 * cellSize;
+                float3 edgeDist = halfSize - localPos;
+
+                // Thin line around each axis-aligned boundary
+                float border = step(edgeDist.x, lineWidth) + step(edgeDist.y, lineWidth) + step(edgeDist.z, lineWidth);
+                return saturate(border); // 0 or 1
+            }
+
             half4 Fragment(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-
-                // Convert from Unity bottom-left to p5 top-left UV convention
-                float2 canvasUv = float2(input.uv.x, 1.0 - input.uv.y);
-
-                // Grid dimensions (similar to p5.js calculation)
+                float2 uv = input.uv;
+                float2 asp = _ScaledScreenParams.x /
+                             max(_ScaledScreenParams.y, 1.0);
                 float cols = _Resolution;
-                float aspectRatio = 16.0 / 9.0; // Adjust based on your canvas aspect
-                float rows = floor(cols / aspectRatio);
+                float rows = floor(cols / asp);
 
                 // Current grid cell
-                float2 cellId = floor(canvasUv * float2(cols, rows));
-                float2 cellUv = frac(canvasUv * float2(cols, rows));
+                float2 cellId = floor(uv * float2(cols, rows));
+                float2 cellUv = frac(uv * float2(cols, rows));
 
-                // Sample reference image at cell center (like p5 loop)
+                // Replace the fixed cell-center lookup with an adaptive
+                // quadtree lookup. The ASCII pattern itself still uses the
+                // original regular grid through cellUv.
                 float2 cellCenterUv = (cellId + 0.5) / float2(cols, rows);
-                // Convert back to standard UV for texture sampling
-                float2 refUv = float2(cellCenterUv.x, cellCenterUv.y);
-                refUv = refUv * _MainTex_ST.xy + _MainTex_ST.zw;
 
-                half3 refColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(refUv)).rgb;
+                float2 analysisUv = cellCenterUv;
+                float divisions = MIN_DIVISIONS;
+                float2 quadCenter = (floor(analysisUv * divisions) + 0.5) / divisions;
+                float quadSize = 1.0 / divisions;
+                float4 quadInfo = 0.0;
+
+                [loop]
+                for (int iteration = 0; iteration < MAX_ITERATIONS; ++iteration)
+                {
+                    quadInfo = QuadColorVariation(_MainTex, sampler_MainTex, quadCenter, quadSize);
+
+                    if (quadInfo.w < _Threshold)
+                        break;
+
+                    divisions *= 2.0;
+                    quadCenter = (floor(analysisUv * divisions) + 0.5) / divisions;
+                    quadSize *= 0.5;
+                }
+                // Draw the boundary of the selected adaptive quad. _ScaledScreenParams
+                // is the URP equivalent of Shadertoy's iResolution for this pass.
+                float2 normalizedQuadUV = frac(uv * divisions);
+                float2 pixelWidth = _LineWidth / max(_ScaledScreenParams.xy, 1.0);
+                float2 distanceToCenter = abs(normalizedQuadUV - 0.5);
+                float lineMask =
+                    step(0.5 - distanceToCenter.x, pixelWidth.x * divisions) +
+                    step(0.5 - distanceToCenter.y, pixelWidth.y * divisions);
+
+                float lineBlend = saturate(lineMask * _LineStrength);
+                
+                // float quadSize;
+                // FindQuadTreeSample(uv, cellCenterUv, quadSize);
+                half3 refColor = (half3)SampleReference(analysisUv);
 
                 // Calculate brightness (0-1)
                 float brightness = dot(refColor, float3(0.299, 0.587, 0.114));
@@ -249,7 +327,12 @@ Shader "Hidden/ASCII Art"
 
                 // Apply HSV shift
                 result = ApplyHsvShift(result);
-                return half4(result, _BackgroundColor.a);
+
+                half3 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(uv)).rgb;
+                result = uv.x > 0.5 ? result : color;
+                result = lerp(result, _LineColor.rgb, lineBlend);
+                return half4(result, 1.0);
+                // return half4(uv.x > 0.25 ? result : color, _BackgroundColor.a);
             }
             ENDHLSL
         }
