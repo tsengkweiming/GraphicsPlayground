@@ -75,6 +75,13 @@ StructuredBuffer<Text>      _TextBuffer;
 int _DotCount;
 int _CharacterCount;
 int _TextCount;
+float _TextRotationMax;
+float _TextRotationSpeed;
+float _TextRotationXMax;
+float _TextRotationXSpeed;
+float _TextPerspective;
+float _TextPositionMax;
+float _TextPositionSpeed;
 
 float proceduralTextSafeScale(float v)
 {
@@ -108,13 +115,13 @@ float proceduralTextCharacterAngle(int textIndex, int charIndex, Character chara
     float seed = float(textIndex) * 113.17
                + float(charIndex) * 37.91
                + dot(character.position.xy, float2(0.071, 0.137));
-    float noiseX = seed + time * PROCEDURAL_TEXT_RANDOM_ROTATION_SPEED;
+    float noiseX = seed + time * _TextRotationSpeed;
     float noise = proceduralTextPerlin1D(noiseX);
 #if PROCEDURAL_TEXT_MOTION_DETAIL
     noise = noise * 0.72
           + proceduralTextPerlin1D(noiseX * 0.47 + seed * 0.13 + 19.7) * 0.28;
 #endif
-    return clamp(noise, -1.0, 1.0) * PROCEDURAL_TEXT_RANDOM_ROTATION_MAX;
+    return clamp(noise, -1.0, 1.0) * _TextRotationMax;
 }
 
 float proceduralTextCharacterXAngle(int textIndex, int charIndex, Character character, float time)
@@ -122,13 +129,13 @@ float proceduralTextCharacterXAngle(int textIndex, int charIndex, Character char
     float seed = float(textIndex) * 71.43
                + float(charIndex) * 47.29
                + dot(character.position.xy, float2(0.113, 0.191));
-    float noiseX = seed + time * PROCEDURAL_TEXT_RANDOM_ROTATION_X_SPEED;
+    float noiseX = seed + time * _TextRotationXSpeed;
     float noise = proceduralTextPerlin1D(noiseX);
 #if PROCEDURAL_TEXT_MOTION_DETAIL
     noise = noise * 0.7
           + proceduralTextPerlin1D(noiseX * 0.53 + seed * 0.17 + 31.3) * 0.3;
 #endif
-    return clamp(noise, -1.0, 1.0) * PROCEDURAL_TEXT_RANDOM_ROTATION_X_MAX;
+    return clamp(noise, -1.0, 1.0) * _TextRotationXMax;
 }
 
 float2 proceduralTextCharacterOffset(int textIndex, int charIndex, Character character, float time)
@@ -136,8 +143,8 @@ float2 proceduralTextCharacterOffset(int textIndex, int charIndex, Character cha
     float seed = float(textIndex) * 83.29
                + float(charIndex) * 61.71
                + dot(character.position.xy, float2(0.173, 0.097));
-    float noiseX = seed + time * PROCEDURAL_TEXT_RANDOM_POSITION_SPEED;
-    float noiseY = seed * 1.37 + 47.3 + time * PROCEDURAL_TEXT_RANDOM_POSITION_SPEED * 0.83;
+    float noiseX = seed + time * _TextPositionSpeed;
+    float noiseY = seed * 1.37 + 47.3 + time * _TextPositionSpeed * 0.83;
     float2 noise = float2(
         proceduralTextPerlin1D(noiseX),
         proceduralTextPerlin1D(noiseY)
@@ -149,7 +156,7 @@ float2 proceduralTextCharacterOffset(int textIndex, int charIndex, Character cha
     ) * 0.26;
 #endif
 
-    return clamp(noise, -1.0, 1.0) * PROCEDURAL_TEXT_RANDOM_POSITION_MAX;
+    return clamp(noise, -1.0, 1.0) * _TextPositionMax;
 }
 
 float2 proceduralTextCharacterScale(Character character)
@@ -182,7 +189,7 @@ float2 proceduralTextDotPosition(
         cosAngle * tilted.x - sinAngle * tilted.y,
         sinAngle * tilted.x + cosAngle * tilted.y
     );
-    float focal = max(PROCEDURAL_TEXT_PERSPECTIVE, 0.0001);
+    float focal = max(_TextPerspective, 0.0001);
     float perspective = focal / max(focal + tilted.z, focal * 0.25);
 
     return origin + pivot + rotated * perspective;

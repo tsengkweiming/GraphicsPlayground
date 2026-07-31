@@ -39,6 +39,7 @@ float _RotateXMultiplier;
 float _RotateYMultiplier;
 float2 _StickSize;
 int _LightType;
+float _ColorTime;
 
 static const int STICK_MODE = 0;
 static const int CUBE_MODE = 1;
@@ -92,6 +93,17 @@ float hash11(float n) {
     return frac(sin(n * 127.1) * 43758.5453);
 }
 
+float3 randomTextTint(float time) {
+    float phase = time * 0.75;
+    float phase0 = floor(phase);
+    float blend = smoothstep(0.0, 1.0, frac(phase));
+    float hue0 = hash11(phase0 + 17.31);
+    float hue1 = hash11(phase0 + 18.31);
+    float3 color0 = hsl2rgb(hue0, 0.95, 0.62);
+    float3 color1 = hsl2rgb(hue1, 0.95, 0.62);
+    return  lerp(1, lerp(color0, color1, blend), _ColorTime);
+}
+
 float2 rectWeaveLightDir(float t) {
     float2 d = float2(cos(t * 1.7 + 0.6), sin(t * 1.13 - 0.4));
     return d / max(length(d), 0.0001);
@@ -104,7 +116,7 @@ float evalScenePattern(float2 p, float t, out float3 col, out float isLight) {
 
     int objectCount = max(_ObjectCount, 1);
     float invObjectCount = 1.0 / float(objectCount);
-    float edgeR = _EdgeThickness;
+    float edgeR = _EdgeThickness;//max(_EdgeThickness, 0.);
     float sceneSize = min(_Resolution.x, _Resolution.y);
 
     if (_LightType == STICK_MODE)
@@ -313,8 +325,8 @@ float evalScenePattern(float2 p, float t, out float3 col, out float isLight) {
         if (_TextCount > 0 && _CharacterCount > 0 && _DotCount > 1)
         {
             float4 textColor;
-            col = textColor.rgb * max(textColor.a, 1.0) * 2.4;
             minD = sdProceduralText2D(p, edgeR, t, textColor);
+            col = textColor.rgb * randomTextTint(_Time) * textColor.a * 2.4;//max(textColor.a, 1.0) * 2.4;
             isLight = 1.0;
         }
     }

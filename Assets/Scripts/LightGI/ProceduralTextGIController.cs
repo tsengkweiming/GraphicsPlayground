@@ -57,6 +57,7 @@ public class TextGIParam : ShaderControllerParam<TextGIParam>
     public float textPerspective;
     public float textPositionMax;
     public float textPositionSpeed;
+    public float colorTime;
 
     public override void CopyFrom(TextGIParam other)
     {
@@ -83,6 +84,7 @@ public class TextGIParam : ShaderControllerParam<TextGIParam>
         textPerspective = other.textPerspective;
         textPositionMax = other.textPositionMax;
         textPositionSpeed = other.textPositionSpeed;
+        colorTime = other.colorTime;
     }
 
     public override void MoveTowards(TextGIParam target, float t)
@@ -110,6 +112,7 @@ public class TextGIParam : ShaderControllerParam<TextGIParam>
         textPerspective = LerpValue(textPerspective, target.textPerspective, t);
         textPositionMax = LerpValue(textPositionMax, target.textPositionMax, t);
         textPositionSpeed = LerpValue(textPositionSpeed, target.textPositionSpeed, t);
+        colorTime = LerpValue(colorTime, target.colorTime, t);
     }
 
     public override bool Approximately(TextGIParam other)
@@ -136,7 +139,9 @@ public class TextGIParam : ShaderControllerParam<TextGIParam>
             && ApproximatelyValue(textRotationXSpeed, other.textRotationXSpeed)
             && ApproximatelyValue(textPerspective, other.textPerspective)
             && ApproximatelyValue(textPositionMax, other.textPositionMax)
-            && ApproximatelyValue(textPositionSpeed, other.textPositionSpeed);
+            && ApproximatelyValue(textPositionSpeed, other.textPositionSpeed)
+            && ApproximatelyValue(colorTime, other.colorTime)
+            ;
     }
 }
 
@@ -383,6 +388,7 @@ public class ProceduralTextGIController : MonoBehaviour
         _lightCompute.SetFloat ("_TextPerspective", param.textPerspective);
         _lightCompute.SetFloat ("_TextPositionMax", param.textPositionMax);
         _lightCompute.SetFloat ("_TextPositionSpeed", param.textPositionSpeed);
+        _lightCompute.SetFloat ("_ColorTime", param.colorTime);
         _lightCompute.SetVector("_StickSize", param.StickSize);
         _lightCompute.SetInt   ("_DotCount",       _dots?.Length ?? 0);
         _lightCompute.SetInt   ("_CharacterCount", _characters?.Length ?? 0);
