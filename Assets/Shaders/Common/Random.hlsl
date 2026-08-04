@@ -5,6 +5,35 @@
 #define PI 3.14159265359f
 #endif
 
+// Pseudo-random generator based on a seed
+float random1to1(float seed) {
+    return frac(sin(seed * 12.9898) * 43758.5453);
+}
+
+float hash(float n) { return frac(sin(n) * 1e4); }
+
+float hash11(float p) {
+    p = frac(p * 0.1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return frac(p);
+}
+
+// A deterministic 2D hash. Keeping the quad center as the seed means
+// every pixel in a quad uses the same sample locations.
+float2 hash22(float2 p)
+{
+    float n = sin(dot(p, float2(41.0, 289.0)));
+    return frac(float2(262144.0, 32768.0) * n);
+}
+
+float hash2d(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * 0.13);
+    p3 += dot(p3, p3.yzx + 3.333);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
 uint rand_hash(uint seed)
 {
 	seed = (seed ^ 61) ^ (seed >> 16);

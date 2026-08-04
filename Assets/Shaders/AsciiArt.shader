@@ -33,6 +33,8 @@ Shader "Hidden/ASCII Art"
         _LineColor ("Grid Line Color", Color) = (0.0, 0.0, 0.0, 1.0)
         _LineWidth ("Grid Line Width (Pixels)", Range(0.1, 4.0)) = 1.0
         _LineStrength ("Grid Line Strength", Range(0.0, 1.0)) = 1.0
+        
+        _PhaseSpeed ("Mono Phase Speed", Float) = 0.1
     }
 
     SubShader
@@ -68,7 +70,8 @@ Shader "Hidden/ASCII Art"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Assets/Shaders/Common/QuadTree.hlsl"
-            #include "Assets/Packages/CustomPostProcessing/Shaders//Common/OctreeGrid.hlsl"
+            #include "Assets/Shaders/Common/MonoPhase.hlsl"
+            #include "Assets/Shaders/Common/Level.hlsl"
 
             struct Attributes
             {
@@ -110,15 +113,6 @@ Shader "Hidden/ASCII Art"
                 float _Resolution;
                 float _PosterizeLevels;
                 float _QuadTreeThreshold;
-                float _InputBlack;
-                float _InputWhite;
-                float _Gamma;
-                float _Contrast;
-                float _Brightness;
-                float _InvertLuma;
-                float _HueShift;
-                float _Saturation;
-                float _Value;
                 float _Threshold;
                 float4 _LineColor;
                 float _LineWidth;
@@ -141,27 +135,6 @@ Shader "Hidden/ASCII Art"
                 return output;
             }
 
-            // Remap raw luminance so the image's usable tonal range fills 0-1.
-            // Stretches [InputBlack, InputWhite] to full range, then applies
-            // gamma, contrast (pivoted around mid-grey) and a brightness offset.
-            float AdjustLuminance(float luma)
-            {
-                // Levels: stretch input range to 0-1 (guard against zero span)
-                float span = max(_InputWhite - _InputBlack, 1e-4);
-                float t = saturate((luma - _InputBlack) / span);
-
-                // Gamma correction
-                t = pow(t, 1.0 / max(_Gamma, 1e-4));
-
-                // Contrast around mid-grey + brightness offset
-                t = saturate((t - 0.5) * _Contrast + 0.5 + _Brightness);
-
-                // Optional inversion (dark subject on light bg vs. reverse)
-                t = lerp(t, 1.0 - t, _InvertLuma);
-
-                return t;
-            }
-
             // Posterize function: reduce brightness levels
             float Posterize(float brightness, float levels)
             {
@@ -174,7 +147,6 @@ Shader "Hidden/ASCII Art"
                 float2 sampleUv = uv * _MainTex_ST.xy + _MainTex_ST.zw;
                 return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(sampleUv)).rgb;
             }
-
 
             // Map brightness (0-1) to Pattern index (0-4)
             int GetIndex(float brightness, int numPatterns)
@@ -203,49 +175,6 @@ Shader "Hidden/ASCII Art"
 
                 return color;
             }
-
-            // RGB to HSV conversion
-            float3 RgbToHsv(float3 c)
-            {
-                float4 K = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-                float4 p = lerp(float4(c.bg, K.wz), float4(c.gb, K.xy), step(c.b, c.g));
-                float4 q = lerp(float4(p.xyw, c.r), float4(c.r, p.yzx), step(p.x, c.r));
-
-                float d = q.x - min(q.w, q.y);
-                float e = 1.0e-10;
-                return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
-            }
-
-            // HSV to RGB conversion
-            float3 HsvToRgb(float3 c)
-            {
-                float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-                float3 p = abs(frac(c.xxx + K.xyz) * 6.0 - K.www);
-                return c.z * lerp(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-            }
-
-            // Apply HSV shift to color
-            half3 ApplyHsvShift(half3 rgb)
-            {
-                float3 hsv = RgbToHsv(rgb);
-                hsv.x = frac(hsv.x + _HueShift);
-                hsv.y = saturate(hsv.y * _Saturation);
-                hsv.z = saturate(hsv.z * _Value);
-                return HsvToRgb(hsv);
-            }
-            
-            float _T;
-            float _Size;
-            float _Z;
-            float _Z2;
-            float _BeatsPerMinute;
-            float _BorderRate;
-            float4 _BorderColor;
-            
-            // Pseudo-random generator based on a seed
-            float random1to1(float seed) {
-                return frac(sin(seed * 12.9898) * 43758.5453);
-            }
             
             float gridOutline(float3 p, float3 cellSize, float lineWidth)
             {
@@ -265,6 +194,7 @@ Shader "Hidden/ASCII Art"
                 float2 uv = input.uv;
                 float2 asp = _ScaledScreenParams.x /
                              max(_ScaledScreenParams.y, 1.0);
+                
                 float cols = _Resolution;
                 float rows = floor(cols / asp);
 
@@ -329,6 +259,8 @@ Shader "Hidden/ASCII Art"
                 result = ApplyHsvShift(result);
 
                 half3 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(uv)).rgb;
+                float index = mono_phase(uv, _Time.y);
+                return float4(lerp(color, result, index),1);
                 result = uv.x > 0.5 ? result : color;
                 result = lerp(result, _LineColor.rgb, lineBlend);
                 return half4(result, 1.0);

@@ -48,7 +48,7 @@ Shader "Unlit/WindingGlyph"
             #include "../Common/Palette.hlsl"
             #include "../Common/SDFont.hlsl"
             #include "../Common/Noise.hlsl"
-            #include "../Common/Random.cginc"
+            #include "../Common/Random.hlsl"
 
             // #define SCENE 2
             // #define PALETTE 2

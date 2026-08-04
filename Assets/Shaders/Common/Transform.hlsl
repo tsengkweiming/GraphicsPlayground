@@ -6,6 +6,13 @@ float ConvertDegToRad(float degrees)
     return (3.141592 / 180.0) * degrees;
 }
 
+// 2D Rotation Matrix
+float2x2 rotate2D(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return float2x2(c, -s, s, c);
+}
+
 // ---------------------------------------------------------------------------
 //  Rotation matrices 
 // ---------------------------------------------------------------------------

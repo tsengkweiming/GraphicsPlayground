@@ -1,6 +1,8 @@
 #ifndef __SDFont_INCLUDED__
 #define __SDFont_INCLUDED__
 
+#include "./SDF.hlsl"
+
 #ifndef PI
 #define PI 3.14159265359f
 #endif
@@ -10,72 +12,6 @@
 #ifndef SQ2OV2
 #define SQ2OV2 0.707106781187
 #endif
-
-float dot2( in float2 v ) { return dot(v,v); }
-
-float sdSegment( in float2 p, in float2 a, in float2 b ){
-    float2 pa = p-a, ba = b-a;
-    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
-    return length( pa - ba*h );
-}
-
-float sdTunnel( in float2 p, in float2 wh )
-{
-    p.x = abs(p.x); p.y = -p.y;
-    float2 q = p - wh;
-
-    float d1 = dot2(float2(max(q.x,0.0),q.y));
-    q.x = (p.y>0.0) ? q.x : length(p)-wh.x;
-    float d2 = dot2(float2(q.x,max(q.y,0.0)));
-    float d = sqrt( min(d1,d2) );
-    
-    return (max(q.x,q.y)<0.0) ? -d : d;
-}
-
-float sdHalfCircle( in float2 p, in float r, in float rb )
-{
-    p.x = abs(p.x);
-    return ((0.>p.y) ? length(float2(p.x-r, p.y)) : 
-                                  abs(length(p)-r)) - rb;
-}
-
-float sdVerticalCapsule( float2 p, float h, float r ){
-    p.y -= clamp( p.y, 0.0, h );
-    return length( p ) - r; 
-}
-
-float sdRoundedBox( in float2 p, in float2 b, in float4 r ){
-    r.xy = (p.x>0.0)?r.xy : r.zw;
-    r.x  = (p.y>0.0)?r.x  : r.y;
-    float2 q = abs(p)-b+r.x;
-    return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r.x;
-}
-
-//sdf is wrong in the middle of the box if b.x>b.y
-float sdHalfRoundedBox(in float2 p, in float2 b, in float2 r){
-    r.x  = (p.y>0.0)?r.x  : r.y;
-    p.x=abs(p.x);
-    float2 q = p-b+r.x;
-    return (p.y>0.)?
-        abs(min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r.x):
-        length(float2(abs(p.x)-b.x, p.y));
-}
-
-float sdArc( in float2 p, in float2 sc, in float ra, float rb )
-{
-    // sc is the sin/cos of the arc's aperture
-    p.x = abs(p.x);
-    return ((sc.y*p.x>sc.x*p.y) ? length(p-sc*ra) : 
-                                  abs(length(p)-ra)) - rb;
-}
-
-//https://www.shadertoy.com/view/l3fcR7
-float sdQuarterCircle( in float2 p, in float r, in float l, in float rb )
-{
-    return (.0>p.y||.0>p.x)?
-        length(p-((p.x>p.y)?float2(r, -clamp(-p.y, 0., l)):float2(-clamp(-p.x, 0., l), r)))-rb:
-        abs(length(p)-r) - rb;
-}
 
 // TODO : 
 //    - start on special chars (so much work...)

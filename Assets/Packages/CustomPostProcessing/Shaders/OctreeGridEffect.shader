@@ -50,7 +50,7 @@ Shader "Hidden/CustomPostProcess/OctreeGridEffect"
                 float2 uv = input.uv;
                 float2 asp = _ScaledScreenParams.x / _ScaledScreenParams.y;
 
-                float bpm = (4 * 60.0) / _BeatsPerMinute;
+                float bpm = 4 * 60.0 / _BeatsPerMinute;
                 float cycle = 1e-6 + bpm;
                 float timeMod = fmod(_Time.y, cycle);
                 float seed = floor(_Time.y / cycle);

@@ -8,7 +8,6 @@
 #define TWO_PI 6.2831853072
 #endif
 
-
 // https://math.stackexchange.com/questions/3020095/signed-angle-in-plane:
 // "the ratio of the cross product and scalar product is the tangent of the angle"
 // From [1]: "The tangent of the signed angle between a and b is det([ab]) / dot(ab)"
@@ -20,16 +19,6 @@ float signedAngle(float2 a, float2 b){
 float2 rotate2d(float2 v, float a){
     return mul(v, float2x2(cos(a),-sin(a), sin(a), cos(a)));
 }
-
-// https://www.shadertoy.com/view/4djSRW
-float hash11(float p){
-    p = frac(p * 0.1031);
-    p *= p + 33.33;
-    p *= p + p;
-    return frac(p);
-}
-
-float hash(float n) { return frac(sin(n) * 1e4); }
 
 float3 rotateY(float3 p, float a)
 {

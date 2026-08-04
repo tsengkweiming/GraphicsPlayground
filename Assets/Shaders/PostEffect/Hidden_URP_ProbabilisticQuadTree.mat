@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Unlit_PrismDream
-  m_Shader: {fileID: 4800000, guid: 1ad7e8cb258b49bba990e9fa159e08dd, type: 3}
+  m_Name: Hidden_URP_ProbabilisticQuadTree
+  m_Shader: {fileID: 4800000, guid: fd91726c3070e51439a552e9d5c4d9bb, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -24,19 +24,16 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: b8910f2b9b9ac18428f0ad3deea497b0, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _ColorSpread: 1.2
-    - _Exposure: 1
-    - _PatternBlend: 0.357
-    - _PrismRadius: 5
-    - _RepeatScale: 0.25
-    - _ShapeMode: 5.27
-    - _StepScale: 1.14
-    - _WarpStrength: 0
-    m_Colors: []
+    - _LineStrength: 1
+    - _LineWidth: 0.4
+    - _Resolution: 184
+    - _Threshold: 0.01
+    m_Colors:
+    - _LineColor: {r: 0.5509434, g: 0.827, b: 0.5509434, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

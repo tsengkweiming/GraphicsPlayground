@@ -40,6 +40,7 @@ Shader "Hidden/Texture Blend Transitions"
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/Common/Random.hlsl"
 
             struct Attributes
             {
@@ -90,23 +91,16 @@ Shader "Hidden/Texture Blend Transitions"
             // NOISE & PATTERN GENERATORS
             // ─────────────────────────────────────────────────────
 
-            float Hash2D(float2 p)
-            {
-                float3 p3 = frac(float3(p.xyx) * 0.13);
-                p3 += dot(p3, p3.yzx + 3.333);
-                return frac((p3.x + p3.y) * p3.z);
-            }
-
             float Noise2D(float2 uv)
             {
                 float2 i = floor(uv);
                 float2 f = frac(uv);
                 f = f * f * (3.0 - 2.0 * f);
 
-                float n00 = Hash2D(i + float2(0, 0));
-                float n10 = Hash2D(i + float2(1, 0));
-                float n01 = Hash2D(i + float2(0, 1));
-                float n11 = Hash2D(i + float2(1, 1));
+                float n00 = hash2d(i + float2(0, 0));
+                float n10 = hash2d(i + float2(1, 0));
+                float n01 = hash2d(i + float2(0, 1));
+                float n11 = hash2d(i + float2(1, 1));
 
                 float nx0 = lerp(n00, n10, f.x);
                 float nx1 = lerp(n01, n11, f.x);
@@ -143,8 +137,8 @@ Shader "Hidden/Texture Blend Transitions"
                     for (int x = -1; x <= 1; x++)
                     {
                         float2 neighbor = float2(float(x), float(y));
-                        float2 pt = Hash2D(cell + neighbor) * 0.8 + 0.1;
-                        pt += sin(time + Hash2D(cell + neighbor) * 6.28) * 0.1;
+                        float2 pt = hash2d(cell + neighbor) * 0.8 + 0.1;
+                        pt += sin(time + hash2d(cell + neighbor) * 6.28) * 0.1;
                         float dist = distance(fract, pt + neighbor);
                         minDist = min(minDist, dist);
                     }
@@ -229,7 +223,7 @@ Shader "Hidden/Texture Blend Transitions"
                 float2 cell = floor(uv * gridScale);
 
                 // Hash the cell to get per-block threshold [0,1]
-                float cellHash = Hash2D(cell + float2(13.7, 5.3));
+                float cellHash = hash2d(cell + float2(13.7, 5.3));
 
                 // Soften the scatter with subtle noise
                 float softNoise = Noise2D(uv * gridScale) * 0.04;

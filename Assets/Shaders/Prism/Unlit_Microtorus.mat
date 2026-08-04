@@ -7,12 +7,13 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Unlit_PrismDream
-  m_Shader: {fileID: 4800000, guid: 1ad7e8cb258b49bba990e9fa159e08dd, type: 3}
+  m_Name: Unlit_Microtorus
+  m_Shader: {fileID: 4800000, guid: ba322d68417a29a4e8a8447b6c041f09, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - Direction Switch
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -29,14 +30,9 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _ColorSpread: 1.2
-    - _Exposure: 1
-    - _PatternBlend: 0.357
-    - _PrismRadius: 5
-    - _RepeatScale: 0.25
-    - _ShapeMode: 5.27
-    - _StepScale: 1.14
-    - _WarpStrength: 0
-    m_Colors: []
+    - _DirSwitch: 1
+    m_Colors:
+    - _SwipeOffset: {r: 0, g: 0, b: 0, a: 0}
+    - _SwipeWarp: {r: 1, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
