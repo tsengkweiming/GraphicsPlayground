@@ -9,7 +9,7 @@ public class AsciiArtController : ShaderController
     [SerializeField] private Renderer targetRenderer;
 
     [Header("Shader Parameters")]
-    [SerializeField] [Range(10, 350)] private float resolution = 59f;
+    [SerializeField] [Range(1, 300)] private float resolution = 60f;
     [SerializeField] [Range(2, 8)] private float posterizeLevels = 5f;
     [SerializeField] private Color backgroundColor = Color.white;
     [SerializeField] private bool flipY = false;

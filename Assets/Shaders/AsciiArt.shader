@@ -71,6 +71,7 @@ Shader "Hidden/ASCII Art"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Assets/Shaders/Common/QuadTree.hlsl"
             #include "Assets/Shaders/Common/MonoPhase.hlsl"
+            #include "Assets/Shaders/Common/Pattern.hlsl"
             #include "Assets/Shaders/Common/Level.hlsl"
 
             struct Attributes
@@ -171,8 +172,16 @@ Shader "Hidden/ASCII Art"
                 else if (patternIndex == 3)
                     color = SAMPLE_TEXTURE2D(_Pattern3, sampler_Pattern3, uv).rgb;
                 else
-                    color = SAMPLE_TEXTURE2D(_Pattern4, sampler_Pattern4, uv).rgb;
-
+                {
+                    // color = SAMPLE_TEXTURE2D(_Pattern4, sampler_Pattern4, uv).rgb;
+                    // pattern = pattern_ring(uv, 19, _Time.y);
+                    // pattern = pattern_stripe(uv, 19, _Time.y*5);
+                    // pattern = pattern_grid(uv, 9);
+                    // pattern = pattern_rect(uv, fixed2(0.4,0.1));
+                    float pattern = pattern_circles(uv, 3, 0.35, _Time.y);
+                    color = lerp(float3(0,0,0), 1, pattern);
+                }
+                    
                 return color;
             }
             
