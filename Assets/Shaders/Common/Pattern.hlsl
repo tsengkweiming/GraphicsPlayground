@@ -1,6 +1,21 @@
 #ifndef PATTERN_INCLUDED
 #define PATTERN_INCLUDED
 #include <HLSLSupport.cginc>
+#include "Assets/Shaders/Common/Random.hlsl"
+
+// Scalar masks are black-ink coverage: 0 = no ink, 1 = full ink.
+// Keeping this separate from RGB output makes procedural darkness explicit.
+float pattern_circle_mask(float2 uv, float num, float radius, float t)
+{
+    float2 tiledUv = frac(uv * num + float2(t, 0.0));
+    return 1.0 - step(radius, distance(tiledUv, float2(0.5, 0.5)));
+}
+
+float pattern_random_mask(float2 uv, float scale, float seed, float darkness)
+{
+    float2 cell = floor(uv * scale);
+    return step(hash2d(cell + seed), saturate(darkness));
+}
 
 float pattern_line(float2 uv, float2 range)
 {

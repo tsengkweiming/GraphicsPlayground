@@ -13,7 +13,14 @@ public class AsciiArt3DParam
 
     [Header("Object Depth")]
     [Range(0.01f, 1f)] public float thickness = 0.2f;
-    [Range(-20f, 20f)] public float randomDepthOffset = 0.5f;
+    [Range(-50f, 50f)] public float randomDepthOffset = 0.5f;
+
+    [Header("Depth Motion")]
+    [Min(0f)] public float depthMotionAmplitude = 0f;
+    [Min(0f)] public float depthMotionSpeed = 1f;
+    
+    public Texture2D[] textures;
+    public string textureBindName;
 }
 /// <summary>
 /// Draws a resolution-driven grid of cube instances using the ASCII Art Cubes shader.
@@ -21,7 +28,7 @@ public class AsciiArt3DParam
 /// per cell and applies the same pattern/index mapping as AsciiArt.shader.
 /// </summary>
 [ExecuteAlways]
-public sealed class AsciiArt3DRenderer : MonoBehaviour
+public sealed class AsciiArt3DRenderer : ShaderController
 {
     // RenderMeshInstanced uploads both objectToWorld and worldToObject for a
     // Matrix4x4 instance. Unity therefore limits this instance layout to 511
@@ -31,9 +38,10 @@ public sealed class AsciiArt3DRenderer : MonoBehaviour
     private static readonly int GridColumnsId = Shader.PropertyToID("_GridColumns");
     private static readonly int GridRowsId = Shader.PropertyToID("_GridRows");
     private static readonly int InstanceBaseIndexId = Shader.PropertyToID("_InstanceBaseIndex");
+    private static readonly int DepthMotionAmplitudeId = Shader.PropertyToID("_DepthMotionAmplitude");
+    private static readonly int DepthMotionSpeedId = Shader.PropertyToID("_DepthMotionSpeed");
 
     [Header("Rendering")]
-    [SerializeField] private Material material;
     [SerializeField] private Mesh mesh;
     [SerializeField] private Camera targetCamera;
     [SerializeField] private ShadowCastingMode shadowCasting = ShadowCastingMode.On;
@@ -43,29 +51,29 @@ public sealed class AsciiArt3DRenderer : MonoBehaviour
 
     [SerializeField] private int randomSeed = 1337;
 
-    private MaterialPropertyBlock properties;
-    private NativeArray<Matrix4x4>[] instanceBatches;
-    private int columns;
-    private int rows;
-    private int instanceCount;
-    private int instancesPerBatch;
-    private int lastResolution = -1;
-    private Vector2 lastGridSize;
-    private float lastCellGap = -1f;
-    private float lastCubeThickness = -1f;
-    private float lastRandomDepthOffset = -1f;
-    private int lastRandomSeed;
-    private Matrix4x4 lastLocalToWorld;
+    private MaterialPropertyBlock _properties;
+    private NativeArray<Matrix4x4>[] _instanceBatches;
+    private int _columns;
+    private int _rows;
+    private int _instanceCount;
+    private int _instancesPerBatch;
+    private int _lastResolution = -1;
+    private Vector2 _lastGridSize;
+    private float _lastCellGap = -1f;
+    private float _lastCubeThickness = -1f;
+    private float _lastRandomDepthOffset = -1f;
+    private int _lastRandomSeed;
+    private Matrix4x4 _lastLocalToWorld;
 
     private void OnEnable()
     {
-        properties ??= new MaterialPropertyBlock();
+        _properties ??= new MaterialPropertyBlock();
+        
+        if (_material != null)
+            _material.enableInstancing = true;
 
         if (mesh == null)
             mesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
-
-        if (material != null)
-            material.enableInstancing = true;
 
         RebuildIfNeeded(true);
     }
@@ -87,7 +95,7 @@ public sealed class AsciiArt3DRenderer : MonoBehaviour
 
     private void RebuildIfNeeded(bool force)
     {
-        if (material == null || mesh == null)
+        if (_material == null || mesh == null)
             return;
 
         int safeResolution = Mathf.Max(1, param.resolution);
@@ -95,38 +103,38 @@ public sealed class AsciiArt3DRenderer : MonoBehaviour
         Matrix4x4 localToWorld = transform.localToWorldMatrix;
 
         bool changed = force ||
-                       safeResolution != lastResolution ||
-                       !Mathf.Approximately(gridSize.x, lastGridSize.x) ||
-                       !Mathf.Approximately(gridSize.y, lastGridSize.y) ||
-                       !Mathf.Approximately(param.cellGap, lastCellGap) ||
-                       !Mathf.Approximately(param.thickness, lastCubeThickness) ||
-                       !Mathf.Approximately(param.randomDepthOffset, lastRandomDepthOffset) ||
-                       randomSeed != lastRandomSeed ||
-                       localToWorld != lastLocalToWorld;
+                       safeResolution != _lastResolution ||
+                       !Mathf.Approximately(gridSize.x, _lastGridSize.x) ||
+                       !Mathf.Approximately(gridSize.y, _lastGridSize.y) ||
+                       !Mathf.Approximately(param.cellGap, _lastCellGap) ||
+                       !Mathf.Approximately(param.thickness, _lastCubeThickness) ||
+                       !Mathf.Approximately(param.randomDepthOffset, _lastRandomDepthOffset) ||
+                       randomSeed != _lastRandomSeed ||
+                       localToWorld != _lastLocalToWorld;
 
         if (!changed)
             return;
 
-        columns = safeResolution;
+        _columns = safeResolution;
         float aspect = gridSize.x / gridSize.y;
-        rows = Mathf.Max(1, Mathf.FloorToInt(columns / Mathf.Max(aspect, 0.0001f)));
-        instanceCount = columns * rows;
+        _rows = Mathf.Max(1, Mathf.FloorToInt(_columns / Mathf.Max(aspect, 0.0001f)));
+        _instanceCount = _columns * _rows;
 
         // Keep batch boundaries on row boundaries whenever one row fits in
         // Unity's RenderMeshInstanced limit. This makes each batch base index
         // a clean multiple of the grid column count.
-        int rowsPerBatch = columns <= MaxInstancesPerDraw
-            ? Mathf.Max(1, MaxInstancesPerDraw / columns)
+        int rowsPerBatch = _columns <= MaxInstancesPerDraw
+            ? Mathf.Max(1, MaxInstancesPerDraw / _columns)
             : 1;
-        instancesPerBatch = columns <= MaxInstancesPerDraw
-            ? rowsPerBatch * columns
+        _instancesPerBatch = _columns <= MaxInstancesPerDraw
+            ? rowsPerBatch * _columns
             : MaxInstancesPerDraw;
 
         DisposeInstanceBatches();
-        instanceBatches = new NativeArray<Matrix4x4>[Mathf.CeilToInt(instanceCount / (float)instancesPerBatch)];
+        _instanceBatches = new NativeArray<Matrix4x4>[Mathf.CeilToInt(_instanceCount / (float)_instancesPerBatch)];
 
-        float cellWidth = gridSize.x / columns;
-        float cellHeight = gridSize.y / rows;
+        float cellWidth = gridSize.x / _columns;
+        float cellHeight = gridSize.y / _rows;
         float minimumCell = Mathf.Min(cellWidth, cellHeight);
         float cubeDepth = minimumCell * Mathf.Max(param.thickness, 0.01f);
         Vector3 cubeScale = new Vector3(
@@ -134,18 +142,18 @@ public sealed class AsciiArt3DRenderer : MonoBehaviour
             cellHeight * (1f - param.cellGap),
             cubeDepth);
 
-        for (int batchIndex = 0; batchIndex < instanceBatches.Length; batchIndex++)
+        for (int batchIndex = 0; batchIndex < _instanceBatches.Length; batchIndex++)
         {
-            int batchStart = batchIndex * instancesPerBatch;
-            int batchCount = Mathf.Min(instancesPerBatch, instanceCount - batchStart);
+            int batchStart = batchIndex * _instancesPerBatch;
+            int batchCount = Mathf.Min(_instancesPerBatch, _instanceCount - batchStart);
             NativeArray<Matrix4x4> batch = new NativeArray<Matrix4x4>(
                 batchCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
             for (int localIndex = 0; localIndex < batchCount; localIndex++)
             {
                 int globalIndex = batchStart + localIndex;
-                int x = globalIndex % columns;
-                int y = globalIndex / columns;
+                int x = globalIndex % _columns;
+                int y = globalIndex / _columns;
 
                 float localX = -gridSize.x * 0.5f + (x + 0.5f) * cellWidth;
                 float localY = -gridSize.y * 0.5f + (y + 0.5f) * cellHeight;
@@ -158,40 +166,48 @@ public sealed class AsciiArt3DRenderer : MonoBehaviour
                 batch[localIndex] = localToWorld * localMatrix;
             }
 
-            instanceBatches[batchIndex] = batch;
+            _instanceBatches[batchIndex] = batch;
         }
 
-        lastResolution = safeResolution;
-        lastGridSize = gridSize;
-        lastCellGap = param.cellGap;
-        lastCubeThickness = param.thickness;
-        lastRandomDepthOffset = param.randomDepthOffset;
-        lastRandomSeed = randomSeed;
-        lastLocalToWorld = localToWorld;
+        _lastResolution = safeResolution;
+        _lastGridSize = gridSize;
+        _lastCellGap = param.cellGap;
+        _lastCubeThickness = param.thickness;
+        _lastRandomDepthOffset = param.randomDepthOffset;
+        _lastRandomSeed = randomSeed;
+        _lastLocalToWorld = localToWorld;
     }
 
     private void DrawInstances()
     {
-        if (!material || !mesh || instanceBatches == null)
+        if (!_material || !mesh || _instanceBatches == null)
             return;
 
-        properties.Clear();
-        properties.SetFloat(GridColumnsId, columns);
-        properties.SetFloat(GridRowsId, rows);
+        _properties.Clear();
+        _properties.SetFloat(GridColumnsId, _columns);
+        _properties.SetFloat(GridRowsId, _rows);
+        _properties.SetFloat(DepthMotionAmplitudeId, Mathf.Max(0f, param.depthMotionAmplitude));
+        _properties.SetFloat(DepthMotionSpeedId, Mathf.Max(0f, param.depthMotionSpeed));
+
+        for (var i = 0; i < param.textures.Length; i++)
+        {
+            var texName = $"{param.textureBindName}{i}";
+            _properties.SetTexture(texName, param.textures[i]);
+        }
 
         Bounds worldBounds = CalculateWorldBounds();
 
-        for (int batchIndex = 0; batchIndex < instanceBatches.Length; batchIndex++)
+        for (int batchIndex = 0; batchIndex < _instanceBatches.Length; batchIndex++)
         {
-            int batchStart = batchIndex * instancesPerBatch;
-            properties.SetFloat(InstanceBaseIndexId, batchStart);
+            int batchStart = batchIndex * _instancesPerBatch;
+            _properties.SetFloat(InstanceBaseIndexId, batchStart);
 
-            RenderParams renderParams = new RenderParams(material)
+            RenderParams renderParams = new RenderParams(_material)
             {
                 camera = targetCamera,
                 layer = gameObject.layer,
                 worldBounds = worldBounds,
-                matProps = properties,
+                matProps = _properties,
                 shadowCastingMode = shadowCasting,
                 receiveShadows = receiveShadows
             };
@@ -200,14 +216,14 @@ public sealed class AsciiArt3DRenderer : MonoBehaviour
                 renderParams,
                 mesh,
                 0,
-                instanceBatches[batchIndex]);
+                _instanceBatches[batchIndex]);
         }
     }
 
     private Bounds CalculateWorldBounds()
     {
-        Vector3 localMin = new Vector3(-lastGridSize.x * 0.5f, -lastGridSize.y * 0.5f, -lastGridSize.x);
-        Vector3 localMax = new Vector3(lastGridSize.x * 0.5f, lastGridSize.y * 0.5f, lastGridSize.x);
+        Vector3 localMin = new Vector3(-_lastGridSize.x * 0.5f, -_lastGridSize.y * 0.5f, -_lastGridSize.x);
+        Vector3 localMax = new Vector3(_lastGridSize.x * 0.5f, _lastGridSize.y * 0.5f, _lastGridSize.x);
         Bounds bounds = new Bounds(transform.TransformPoint(localMin), Vector3.zero);
 
         for (int x = 0; x <= 1; x++)
@@ -226,16 +242,16 @@ public sealed class AsciiArt3DRenderer : MonoBehaviour
 
     private void DisposeInstanceBatches()
     {
-        if (instanceBatches == null)
+        if (_instanceBatches == null)
             return;
 
-        foreach (NativeArray<Matrix4x4> batch in instanceBatches)
+        foreach (NativeArray<Matrix4x4> batch in _instanceBatches)
         {
             if (batch.IsCreated)
                 batch.Dispose();
         }
 
-        instanceBatches = null;
+        _instanceBatches = null;
     }
 
     private static float Hash01(int value, int seed)

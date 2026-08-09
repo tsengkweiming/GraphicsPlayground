@@ -4,14 +4,23 @@ Shader "Hidden/ASCII Art"
     {
         [MainTexture] _MainTex ("Reference Image", 2D) = "white" {}
 
-        // SVG Pattern Textures for different brightness levels
+        // Pattern slots are ordered from darkest to brightest.
         _Pattern0 ("Pattern 0 (Darkest)", 2D) = "white" {}
         _Pattern1 ("Pattern 1", 2D) = "white" {}
         _Pattern2 ("Pattern 2", 2D) = "white" {}
         _Pattern3 ("Pattern 3", 2D) = "white" {}
-        _Pattern4 ("Pattern 4 (Brightest)", 2D) = "white" {}
+        _Pattern4 ("Pattern 4", 2D) = "white" {}
+        _Pattern5 ("Pattern 5", 2D) = "white" {}
+        _Pattern6 ("Pattern 6", 2D) = "white" {}
+        _Pattern7 ("Pattern 7", 2D) = "white" {}
+        _Pattern8 ("Pattern 8", 2D) = "white" {}
+        _Pattern9 ("Pattern 9 (Brightest)", 2D) = "white" {}
 
-        _BackgroundColor ("Background Color", Color) = (1, 1, 1, 1)
+        _PatternCount ("Total Pattern Count", Range(1, 10)) = 5
+        _TextureCount ("Texture Pattern Count", Range(0, 10)) = 4
+
+        _PatternColor ("Pattern Color", Color) = (0, 0, 0, 1)
+        _PatternBackgroundColor ("Pattern Background Color", Color) = (1, 1, 1, 1)
         _Resolution ("Resolution (Grid Columns)", Range(10, 350)) = 60
         _PosterizeLevels ("Posterize Levels", Range(-2, 50)) = 5
         _QuadTreeThreshold ("Quad Tree Variance Threshold", Range(0.0001, 0.01)) = 0.0025
@@ -102,6 +111,16 @@ Shader "Hidden/ASCII Art"
             SAMPLER(sampler_Pattern3);
             TEXTURE2D(_Pattern4);
             SAMPLER(sampler_Pattern4);
+            TEXTURE2D(_Pattern5);
+            SAMPLER(sampler_Pattern5);
+            TEXTURE2D(_Pattern6);
+            SAMPLER(sampler_Pattern6);
+            TEXTURE2D(_Pattern7);
+            SAMPLER(sampler_Pattern7);
+            TEXTURE2D(_Pattern8);
+            SAMPLER(sampler_Pattern8);
+            TEXTURE2D(_Pattern9);
+            SAMPLER(sampler_Pattern9);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -110,9 +129,17 @@ Shader "Hidden/ASCII Art"
                 float4 _Pattern2_ST;
                 float4 _Pattern3_ST;
                 float4 _Pattern4_ST;
-                half4 _BackgroundColor;
+                float4 _Pattern5_ST;
+                float4 _Pattern6_ST;
+                float4 _Pattern7_ST;
+                float4 _Pattern8_ST;
+                float4 _Pattern9_ST;
+                half4 _PatternColor;
+                half4 _PatternBackgroundColor;
                 float _Resolution;
                 float _PosterizeLevels;
+                float _PatternCount;
+                float _TextureCount;
                 float _QuadTreeThreshold;
                 float _Threshold;
                 float4 _LineColor;
@@ -149,17 +176,15 @@ Shader "Hidden/ASCII Art"
                 return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(sampleUv)).rgb;
             }
 
-            // Map brightness (0-1) to Pattern index (0-4)
+            // Map brightness (0-1) to a slot ordered from darkest to brightest.
             int GetIndex(float brightness, int numPatterns)
             {
-                // Invert: darker -> lower index (more detail)
-                float inverted = 1.0 - brightness;
-                int index = int(floor(inverted * numPatterns));
-                return clamp(index, 0, numPatterns - 1);
+                int safeCount = max(numPatterns, 1);
+                int index = int(floor(saturate(brightness) * safeCount));
+                return clamp(index, 0, safeCount - 1);
             }
 
-            // Sample the appropriate pattern based on brightness
-            half3 SamplePattern(float2 uv, int patternIndex)
+            half3 SampleTexturePattern(float2 uv, int patternIndex)
             {
                 half3 color = half3(1, 1, 1);
 
@@ -171,18 +196,73 @@ Shader "Hidden/ASCII Art"
                     color = SAMPLE_TEXTURE2D(_Pattern2, sampler_Pattern2, uv).rgb;
                 else if (patternIndex == 3)
                     color = SAMPLE_TEXTURE2D(_Pattern3, sampler_Pattern3, uv).rgb;
+                else if (patternIndex == 4)
+                    color = SAMPLE_TEXTURE2D(_Pattern4, sampler_Pattern4, uv).rgb;
+                else if (patternIndex == 5)
+                    color = SAMPLE_TEXTURE2D(_Pattern5, sampler_Pattern5, uv).rgb;
+                else if (patternIndex == 6)
+                    color = SAMPLE_TEXTURE2D(_Pattern6, sampler_Pattern6, uv).rgb;
+                else if (patternIndex == 7)
+                    color = SAMPLE_TEXTURE2D(_Pattern7, sampler_Pattern7, uv).rgb;
+                else if (patternIndex == 8)
+                    color = SAMPLE_TEXTURE2D(_Pattern8, sampler_Pattern8, uv).rgb;
                 else
-                {
-                    // color = SAMPLE_TEXTURE2D(_Pattern4, sampler_Pattern4, uv).rgb;
-                    // pattern = pattern_ring(uv, 19, _Time.y);
-                    // pattern = pattern_stripe(uv, 19, _Time.y*5);
-                    // pattern = pattern_grid(uv, 9);
-                    // pattern = pattern_rect(uv, fixed2(0.4,0.1));
-                    float pattern = pattern_circles(uv, 3, 0.35, _Time.y);
-                    color = lerp(float3(0,0,0), 1, pattern);
-                }
+                    color = SAMPLE_TEXTURE2D(_Pattern9, sampler_Pattern9, uv).rgb;
                     
                 return color;
+            }
+
+            // Return a procedural pattern whose expected black coverage is
+            // controlled by darkness. The pattern slot, not the source RGB,
+            // determines darkness, so GetIndex remains the single selector.
+            half3 SampleProceduralPattern(float2 uv, int proceduralIndex, float darkness)
+            {
+                float seed = (float)proceduralIndex + 1.0;
+                float style = floor(hash11(seed * 17.31) * 4.0);
+                float scale = lerp(3.0, 11.0, hash11(seed * 29.17));
+                float phase = hash11(seed * 43.73);
+                float mask;
+
+                if (style < 1.0)
+                {
+                    // Animated circles. Radius is area-matched to the target
+                    // darkness for the normal circle range.
+                    float radius = 0.5 * sqrt(saturate(darkness) / 0.78539816);
+                    mask = pattern_circle_mask(uv, scale, radius, _Time.y * 0.08 * phase);
+                }
+                else if (style < 2.0)
+                {
+                    // A stripe field has a direct duty-cycle/darkness mapping.
+                    mask = step(frac(uv.x * scale + phase + _Time.y * 0.03), darkness);
+                }
+                else if (style < 3.0)
+                {
+                    // Cell noise gives a stable random pattern per ASCII cell.
+                    mask = pattern_random_mask(uv, scale, seed, darkness);
+                }
+                else
+                {
+                    // Diagonal bands provide a second continuous coverage field.
+                    float diagonal = frac(dot(uv, normalize(float2(1.0, 1.0)) * scale) + phase);
+                    mask = step(diagonal, darkness);
+                }
+
+                return lerp(_PatternBackgroundColor, _PatternColor, saturate(mask));
+            }
+
+            // The first TextureCount slots sample textures. The remaining
+            // slots are procedural, while retaining the same darkness ladder.
+            half3 SamplePattern(float2 uv, int patternIndex, int patternCount, int textureCount)
+            {
+                int safeCount = max(patternCount, 1);
+                int safeTextureCount = clamp(textureCount, 0, safeCount);
+
+                if (patternIndex < safeTextureCount)
+                    return SampleTexturePattern(uv, patternIndex);
+
+                int proceduralIndex = patternIndex - safeTextureCount;
+                float darkness = 1.0 - (float)patternIndex / max((float)(safeCount - 1), 1.0);
+                return SampleProceduralPattern(uv, proceduralIndex, darkness);
             }
             
             float gridOutline(float3 p, float3 cellSize, float lineWidth)
@@ -258,11 +338,14 @@ Shader "Hidden/ASCII Art"
                 // Posterize brightness
                 float posterized = Posterize(brightness, _PosterizeLevels);
 
-                // Map to Pattern index
-                int imgIndex = GetIndex(posterized, 5);
+                int patternCount = clamp((int)round(_PatternCount), 1, 10);
+                int textureCount = clamp((int)round(_TextureCount), 0, patternCount);
+
+                // Map to the configured pattern ladder.
+                int imgIndex = GetIndex(posterized, patternCount);
 
                 // Sample the appropriate Pattern
-                half3 result = SamplePattern(cellUv, imgIndex);
+                half3 result = SamplePattern(cellUv, imgIndex, patternCount, textureCount);
 
                 // Apply HSV shift
                 result = ApplyHsvShift(result);

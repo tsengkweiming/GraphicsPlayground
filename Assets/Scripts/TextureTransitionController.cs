@@ -29,13 +29,22 @@ public class TextureTransitionController : ShaderController
 
     private int currentTextureIndex = 0;
     private int nextTextureIndex = 1;
-    private float textureChangeTimer = 0f;
+    private float transitionProgress = 0f;
 
     private void OnEnable()
     {
         if (targetRenderer == null)
             targetRenderer = GetComponent<Renderer>();
 
+        InitializeTextures();
+    }
+
+    protected override void Start()
+    {
+        base.Start();
+
+        // ShaderController creates the material in Start, so initialize the
+        // texture pair after the material is available.
         InitializeTextures();
     }
 
@@ -47,6 +56,7 @@ public class TextureTransitionController : ShaderController
             return;
         }
 
+        transitionProgress = 0f;
         SetTextureTransition(0, 1);
     }
 
@@ -55,21 +65,26 @@ public class TextureTransitionController : ShaderController
         if (!_material || textureSequence == null || textureSequence.Length < 2)
             return;
 
-        // Auto-advance texture sequence based on transitionSpeed
-        textureChangeTimer += Time.deltaTime;
-        float cycleDuration = 1f / transitionSpeed;
-
-        if (textureChangeTimer >= cycleDuration)
+        // The controller is the single owner of transition progress and
+        // texture sequencing. The shader only blends the current pair.
+        if (useTimeAuto)
         {
-            textureChangeTimer = 0f;
-            NextTexture();
+            transitionProgress += Time.deltaTime * transitionSpeed;
+
+            if (transitionProgress >= 1f)
+            {
+                transitionProgress = 0f;
+                AdvanceTexturePair();
+            }
+        }
+        else
+        {
+            transitionProgress = 0f;
         }
 
         // Update transition parameters
         _material.SetInt("_BlendMode", transitionMode);
-        _material.SetFloat("_BlendAmount", blendAmount);
-        _material.SetFloat("_TransitionSpeed", transitionSpeed);
-        _material.SetFloat("_UseTime", useTimeAuto ? 1f : 0f);
+        _material.SetFloat("_BlendAmount", useTimeAuto ? transitionProgress : blendAmount);
 
         // Update noise/pattern parameters
         _material.SetFloat("_NoiseScale", noiseScale);
@@ -106,10 +121,8 @@ public class TextureTransitionController : ShaderController
         if (textureSequence == null || textureSequence.Length < 2)
             return;
 
-        currentTextureIndex = (currentTextureIndex + 1) % textureSequence.Length;
-        nextTextureIndex = (nextTextureIndex + 1) % textureSequence.Length;
-
-        SetTextureTransition(currentTextureIndex, nextTextureIndex);
+        transitionProgress = 0f;
+        AdvanceTexturePair();
     }
 
     public void PreviousTexture()
@@ -118,8 +131,16 @@ public class TextureTransitionController : ShaderController
             return;
 
         currentTextureIndex = (currentTextureIndex - 1 + textureSequence.Length) % textureSequence.Length;
-        nextTextureIndex = (nextTextureIndex - 1 + textureSequence.Length) % textureSequence.Length;
+        nextTextureIndex = (currentTextureIndex + 1) % textureSequence.Length;
+        transitionProgress = 0f;
 
+        SetTextureTransition(currentTextureIndex, nextTextureIndex);
+    }
+
+    private void AdvanceTexturePair()
+    {
+        currentTextureIndex = nextTextureIndex;
+        nextTextureIndex = (nextTextureIndex + 1) % textureSequence.Length;
         SetTextureTransition(currentTextureIndex, nextTextureIndex);
     }
 

@@ -41,6 +41,8 @@ Shader "Hidden/ASCII Art 3D"
         [HideInInspector] _GridColumns ("Grid Columns", Float) = 1
         [HideInInspector] _GridRows ("Grid Rows", Float) = 1
         [HideInInspector] _InstanceBaseIndex ("Instance Base Index", Float) = 0
+        _DepthMotionAmplitude ("Depth Motion Amplitude", Float) = 0
+        _DepthMotionSpeed ("Depth Motion Speed", Float) = 1
     }
 
     SubShader
@@ -103,8 +105,9 @@ Shader "Hidden/ASCII Art 3D"
                 float3 normalOS : TEXCOORD3;
                 float3 positionWS : TEXCOORD4;
                 float3 normalWS : TEXCOORD5;
+                float2 cellId : TEXCOORD6;
                 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
-                    float4 shadowCoord : TEXCOORD6;
+                    float4 shadowCoord : TEXCOORD7;
                 #endif
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -157,6 +160,8 @@ Shader "Hidden/ASCII Art 3D"
                 float _GridColumns;
                 float _GridRows;
                 float _InstanceBaseIndex;
+                float _DepthMotionAmplitude;
+                float _DepthMotionSpeed;
             CBUFFER_END
 
             Varyings Vertex(Attributes input)
@@ -172,8 +177,19 @@ Shader "Hidden/ASCII Art 3D"
                 float2 cellId = float2(fmod(globalIndex, columns), floor(globalIndex / columns));
                 float2 gridSize = float2(columns, rows);
 
+                // Give each cube a stable, independent phase and frequency so
+                // depth movement remains random-looking but deterministic.
+                float hash1 = hash11(globalIndex * 17.13 + 4.71);
+                float motionPhase = hash1 * 6.2831853;
+                float motionFrequency = lerp(0.8, 1.2, hash11(globalIndex * 31.79 + 9.23));
+                float depthMotion = hash1 >  0.9 ? sin(_Time.y * _DepthMotionSpeed * motionFrequency + motionPhase)
+                    * _DepthMotionAmplitude : 0;
+
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS);
+                float3 depthDirectionWS = normalize(TransformObjectToWorldDir(float3(0.0, 0.0, 1.0)));
+                vertexInput.positionWS += depthDirectionWS * depthMotion;
+                vertexInput.positionCS = TransformWorldToHClip(vertexInput.positionWS);
                 output.positionCS = vertexInput.positionCS;
                 output.positionWS = vertexInput.positionWS;
                 output.normalWS = normalInput.normalWS;
@@ -181,6 +197,7 @@ Shader "Hidden/ASCII Art 3D"
                     output.shadowCoord = GetShadowCoord(vertexInput);
                 #endif
                 output.uv = input.uv;
+                output.cellId = cellId;
                 output.globalUv = (cellId + 1- input.uv) / gridSize;
                 output.cellCenterUv = (cellId + 0.5) / gridSize;
                 output.cellCenterUv.y = lerp(output.cellCenterUv.y, 1.0 - output.cellCenterUv.y, step(0.5, _FlipY));
@@ -201,7 +218,7 @@ Shader "Hidden/ASCII Art 3D"
                 return clamp(index, 0, safeCount - 1);
             }
 
-            half3 AsciiLightingLambert(half3 lightColor, half3 lightDirection, half3 normalWS)
+            half3 LightingLambert(half3 lightColor, half3 lightDirection, half3 normalWS)
             {
                 return lightColor * saturate(dot(normalWS, lightDirection));
             }
@@ -234,26 +251,28 @@ Shader "Hidden/ASCII Art 3D"
                 return color;
             }
 
-            half3 SampleProceduralPattern(float2 uv, int proceduralIndex, float darkness)
+            half3 SampleProceduralPattern(Varyings input, int proceduralIndex, float darkness)
             {
                 float seed = (float)proceduralIndex + 1.0;
                 float style = floor(hash11(seed * 17.31) * 4.0);
-                float scale = lerp(3.0, 11.0, hash11(seed * 29.17));
+                float scale = lerp(2, 8.0, hash11(seed * 29.17));
                 float phase = hash11(seed * 43.73);
+                float2 uv = input.uv;
+                float seed1 = hash2d(input.cellId);
                 float mask;
 
                 if (style < 1.0)
                 {
                     float radius = 0.5 * sqrt(saturate(darkness) / 0.78539816);
-                    mask = pattern_circle_mask(uv, scale, radius, _Time.y * 0.08 * phase);
+                    return pattern_circles(uv, 3, radius, 0, seed1);
                 }
                 else if (style < 2.0)
                 {
-                    mask = step(frac(uv.x * scale + phase + _Time.y * 0.03), darkness);
+                    mask = pattern_grid(uv, 9);
                 }
                 else if (style < 3.0)
                 {
-                    mask = pattern_random_mask(uv, scale, seed, darkness);
+                    mask = pattern_ring(uv, scale, _Time.y * 0.8 * phase);
                 }
                 else
                 {
@@ -261,20 +280,39 @@ Shader "Hidden/ASCII Art 3D"
                     mask = step(diagonal, darkness);
                 }
 
+                // if (style < 1.0)
+                // {
+                //     float radius = 0.5 * sqrt(saturate(darkness) / 0.78539816);
+                //     mask = pattern_circle_mask(uv, scale, radius, _Time.y * 0.8 * phase);
+                // }
+                // else if (style < 2.0)
+                // {
+                //     mask = step(frac(uv.x * scale + phase + _Time.y * 0.3), darkness);
+                // }
+                // else if (style < 3.0)
+                // {
+                //     mask = pattern_random_mask(uv, scale, seed, darkness);
+                // }
+                // else
+                // {
+                //     float diagonal = frac(dot(uv, normalize(float2(1.0, 1.0)) * scale) + phase);
+                //     mask = step(diagonal, darkness);
+                // }
+
                 return lerp(_PatternBackgroundColor.rgb, _PatternColor.rgb, saturate(mask));
             }
 
-            half3 SamplePattern(float2 uv, int patternIndex, int patternCount, int textureCount)
+            half3 SamplePattern(Varyings input, int patternIndex, int patternCount, int textureCount)
             {
                 int safeCount = max(patternCount, 1);
                 int safeTextureCount = clamp(textureCount, 0, safeCount);
 
                 if (patternIndex < safeTextureCount)
-                    return SampleTexturePattern(uv, patternIndex);
+                    return SampleTexturePattern(input.uv, patternIndex);
 
                 int proceduralIndex = patternIndex - safeTextureCount;
                 float darkness = 1.0 - (float)patternIndex / max((float)(safeCount - 1), 1.0);
-                return SampleProceduralPattern(uv, proceduralIndex, darkness);
+                return SampleProceduralPattern(input, proceduralIndex, darkness);
             }
 
             half4 Fragment(Varyings input) : SV_Target
@@ -290,11 +328,10 @@ Shader "Hidden/ASCII Art 3D"
                 int textureCount = clamp((int)round(_TextureCount), 0, patternCount);
                 int patternIndex = GetIndex(Posterize(brightness, _PosterizeLevels), patternCount);
 
-                half3 patternColor = SamplePattern(input.uv, patternIndex, patternCount, textureCount);
+                half3 patternColor = SamplePattern(input, patternIndex, patternCount, textureCount);
                 patternColor = ApplyHsvShift(patternColor);
 
                 float2 fullUv = input.globalUv;
-                fullUv.y = lerp(fullUv.y, 1.0 - fullUv.y, step(0.5, _FlipY));
                 half3 sourceColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(fullUv)).rgb;
                 float phase = mono_phase(fullUv, _Time.y);
                 half3 result = lerp(sourceColor, patternColor, phase);
@@ -309,7 +346,7 @@ Shader "Hidden/ASCII Art 3D"
 
                 Light mainLight = GetMainLight(shadowCoord);
                 half3 lighting = SampleSH(normalWS) * _AmbientStrength;
-                lighting += AsciiLightingLambert(
+                lighting += LightingLambert(
                     mainLight.color * mainLight.shadowAttenuation,
                     mainLight.direction,
                     normalWS) * _DirectLightStrength;
@@ -346,17 +383,84 @@ Shader "Hidden/ASCII Art 3D"
 
             HLSLPROGRAM
             #pragma target 3.5
-            #pragma vertex ShadowPassVertex
-            #pragma fragment ShadowPassFragment
+            #pragma vertex ShadowVertex
+            #pragma fragment ShadowFragment
             #pragma multi_compile_instancing
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            // Keep the shadow geometry synchronized with the animated forward
+            // pass. This is the same lightweight shadow setup used by the
+            // forward pass, without depending on the package shadow caster
+            // vertex function.
             real LerpWhiteTo(real value, real strength)
             {
                 return lerp(1.0, value, strength);
             }
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+            #include "Assets/Shaders/Common/Random.hlsl"
+
+            float3 _LightDirection;
+            float3 _LightPosition;
+
+            CBUFFER_START(UnityPerMaterial)
+                float _GridColumns;
+                float _InstanceBaseIndex;
+                float _DepthMotionAmplitude;
+                float _DepthMotionSpeed;
+            CBUFFER_END
+
+            struct ShadowAttributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                uint instanceID : SV_InstanceID;
+            };
+
+            struct ShadowVaryings
+            {
+                float4 positionCS : SV_POSITION;
+            };
+
+            float3 AnimatedShadowPositionWS(ShadowAttributes input)
+            {
+                float columns = max(_GridColumns, 1.0);
+                float globalIndex = (float)input.instanceID + max(_InstanceBaseIndex, 0.0);
+                float motionPhase = hash11(globalIndex * 17.13 + 4.71) * 6.2831853;
+                float motionFrequency = lerp(0.8, 1.2, hash11(globalIndex * 31.79 + 9.23));
+                float depthMotion = sin(_Time.y * _DepthMotionSpeed * motionFrequency + motionPhase)
+                    * _DepthMotionAmplitude;
+
+                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 depthDirectionWS = normalize(TransformObjectToWorldDir(float3(0.0, 0.0, 1.0)));
+                return positionWS + depthDirectionWS * depthMotion;
+            }
+
+            ShadowVaryings ShadowVertex(ShadowAttributes input)
+            {
+                ShadowVaryings output;
+                UNITY_SETUP_INSTANCE_ID(input);
+
+                float3 positionWS = AnimatedShadowPositionWS(input);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+
+                #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                    float3 lightDirectionWS = normalize(_LightPosition - positionWS);
+                #else
+                    float3 lightDirectionWS = _LightDirection;
+                #endif
+
+                output.positionCS = TransformWorldToHClip(
+                    ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+                output.positionCS = ApplyShadowClamping(output.positionCS);
+                return output;
+            }
+
+            half4 ShadowFragment(ShadowVaryings input) : SV_TARGET
+            {
+                return 0;
+            }
             ENDHLSL
         }
     }
