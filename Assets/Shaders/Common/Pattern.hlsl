@@ -79,7 +79,7 @@ float3 pattern_circles(float2 uv, float num = 3.0, float size = 0.35, float t = 
                            step(0.9, patternPos.y) * step(patternPos.y, 1.1);
 
     // 4. Color assignment
-    float3 circleColor = lerp(0.0, float3(1.0, 0.0, 0.0), step(0.01, special) * isCenterCircle);
+    float3 circleColor = lerp(0.0, float3(1.0, 0.0, 0.0), step(0.5, special) * isCenterCircle);
     float3 backgroundColor = 1.0;
 
     return lerp(backgroundColor, circleColor, circleMask);

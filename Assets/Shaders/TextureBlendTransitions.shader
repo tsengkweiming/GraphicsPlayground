@@ -7,11 +7,11 @@ Shader "Hidden/Texture Blend Transitions"
 
         _BlendMode ("Blend Mode", Range(0, 9)) = 0
         _BlendAmount ("Blend Amount (0-1)", Range(0, 1)) = 0.5
-        _TransitionSpeed ("Transition Speed", Range(0.1, 5)) = 1.0
+        _TransitionSpeed ("Transition Speed (Controller)", Range(0.1, 5)) = 1.0
         _NoiseScale ("Noise/Pattern Scale", Range(0.1, 10)) = 2.0
         _Distortion ("Distortion Amount", Range(0, 1)) = 0.2
 
-        [Toggle] _UseTime ("Use Time Auto", Float) = 1
+        [Toggle] _UseTime ("Use Time Auto (Controller)", Float) = 0
         [Toggle] _InvertTransition ("Invert Transition", Float) = 0
     }
 
@@ -126,7 +126,7 @@ Shader "Hidden/Texture Blend Transitions"
             }
 
             // Voronoi pattern (manhattan distance based)
-            float Voronoi(float2 uv, float time)
+            float Voronoi(float2 uv)
             {
                 float2 cell = floor(uv);
                 float2 fract = frac(uv);
@@ -138,7 +138,6 @@ Shader "Hidden/Texture Blend Transitions"
                     {
                         float2 neighbor = float2(float(x), float(y));
                         float2 pt = hash2d(cell + neighbor) * 0.8 + 0.1;
-                        pt += sin(time + hash2d(cell + neighbor) * 6.28) * 0.1;
                         float dist = distance(fract, pt + neighbor);
                         minDist = min(minDist, dist);
                     }
@@ -165,10 +164,10 @@ Shader "Hidden/Texture Blend Transitions"
             }
 
             // 3. Voronoi dither
-            float TransitionVoronoi(float2 uv, float t)
+            float TransitionVoronoi(float2 uv, float progress)
             {
-                float voronoi = Voronoi(uv * _NoiseScale, _Time.y);
-                return smoothstep(voronoi, voronoi + 0.1, t);
+                float voronoi = Voronoi(uv * _NoiseScale);
+                return smoothstep(voronoi, voronoi + 0.1, progress);
             }
 
             // 4. Radial sweep (center outward)
@@ -245,10 +244,10 @@ Shader "Hidden/Texture Blend Transitions"
 
             float2 ApplyDistortion(float2 uv, float t, float distortAmount)
             {
-                float noise = Noise2D(uv * 5.0 + _Time.y * 0.5) * 2.0 - 1.0;
-                float noise2 = Noise2D(uv * 3.0 - _Time.y * 0.3) * 2.0 - 1.0;
+                float noise = Noise2D(uv * 5.0) * 2.0 - 1.0;
+                float noise2 = Noise2D(uv * 3.0) * 2.0 - 1.0;
 
-                uv.x += sin(uv.y * 10.0 + _Time.y) * distortAmount * (1.0 - t);
+                uv.x += sin(uv.y * 10.0) * distortAmount * (1.0 - t);
                 uv += float2(noise, noise2) * distortAmount * (1.0 - t) * 0.1;
 
                 return uv;
@@ -264,7 +263,7 @@ Shader "Hidden/Texture Blend Transitions"
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
                 float2 uv = input.uv;
-                float t = lerp(_BlendAmount, frac(_Time.y * _TransitionSpeed), step(0.5, _UseTime));
+                float t = saturate(_BlendAmount);
                 t = lerp(t, 1.0 - t, step(0.5, _InvertTransition));
 
                 // Apply distortion

@@ -47,6 +47,29 @@ Shader "Hidden/ASCII Art 3D"
 
     SubShader
     {
+        HLSLINCLUDE
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/Common/Random.hlsl"
+
+            // Shared by the forward and ShadowCaster passes so animated
+            // geometry and its shadow always use the same motion.
+            float DepthMotion(
+                float instanceId,
+                float instanceBaseIndex,
+                float motionAmplitude,
+                float motionSpeed)
+            {
+                float globalIndex = instanceId + max(instanceBaseIndex, 0.0);
+                float hash1 = hash11(globalIndex * 17.13 + 4.71);
+                float motionPhase = hash1 * 6.2831853;
+                float motionFrequency = lerp(0.8, 1.2, hash11(globalIndex * 31.79 + 9.23));
+                float active = step(0.9, hash1);
+
+                return active * sin(_Time.y * motionSpeed * motionFrequency + motionPhase)
+                    * motionAmplitude;
+            }
+        ENDHLSL
+
         Tags
         {
             "RenderType" = "Opaque"
@@ -177,13 +200,11 @@ Shader "Hidden/ASCII Art 3D"
                 float2 cellId = float2(fmod(globalIndex, columns), floor(globalIndex / columns));
                 float2 gridSize = float2(columns, rows);
 
-                // Give each cube a stable, independent phase and frequency so
-                // depth movement remains random-looking but deterministic.
-                float hash1 = hash11(globalIndex * 17.13 + 4.71);
-                float motionPhase = hash1 * 6.2831853;
-                float motionFrequency = lerp(0.8, 1.2, hash11(globalIndex * 31.79 + 9.23));
-                float depthMotion = hash1 >  0.9 ? sin(_Time.y * _DepthMotionSpeed * motionFrequency + motionPhase)
-                    * _DepthMotionAmplitude : 0;
+                float depthMotion = DepthMotion(
+                    (float)input.instanceID,
+                    _InstanceBaseIndex,
+                    _DepthMotionAmplitude,
+                    _DepthMotionSpeed);
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS);
@@ -399,7 +420,6 @@ Shader "Hidden/ASCII Art 3D"
                 return lerp(1.0, value, strength);
             }
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
-            #include "Assets/Shaders/Common/Random.hlsl"
 
             float3 _LightDirection;
             float3 _LightPosition;
@@ -425,12 +445,11 @@ Shader "Hidden/ASCII Art 3D"
 
             float3 AnimatedShadowPositionWS(ShadowAttributes input)
             {
-                float columns = max(_GridColumns, 1.0);
-                float globalIndex = (float)input.instanceID + max(_InstanceBaseIndex, 0.0);
-                float motionPhase = hash11(globalIndex * 17.13 + 4.71) * 6.2831853;
-                float motionFrequency = lerp(0.8, 1.2, hash11(globalIndex * 31.79 + 9.23));
-                float depthMotion = sin(_Time.y * _DepthMotionSpeed * motionFrequency + motionPhase)
-                    * _DepthMotionAmplitude;
+                float depthMotion = DepthMotion(
+                    (float)input.instanceID,
+                    _InstanceBaseIndex,
+                    _DepthMotionAmplitude,
+                    _DepthMotionSpeed);
 
                 float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 float3 depthDirectionWS = normalize(TransformObjectToWorldDir(float3(0.0, 0.0, 1.0)));
