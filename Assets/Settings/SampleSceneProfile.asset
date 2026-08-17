@@ -18,18 +18,18 @@ MonoBehaviour:
     m_Value: 0
   threshold:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0.9
   intensity:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 3
   scatter:
     m_OverrideState: 1
-    m_Value: 0.75
+    m_Value: 0.708
   clamp:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 65472
   tint:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: {r: 1, g: 1, b: 1, a: 1}
   highQualityFiltering:
     m_OverrideState: 1
@@ -112,7 +112,7 @@ MonoBehaviour:
     m_Value: 1
   zFactor:
     m_OverrideState: 1
-    m_Value: 0.2
+    m_Value: 1
   cellCount:
     m_OverrideState: 1
     m_Value: 3
@@ -121,7 +121,7 @@ MonoBehaviour:
     m_Value: {x: 0.5, y: 0.5, z: 0.5}
   zFactor2:
     m_OverrideState: 1
-    m_Value: -0.04
+    m_Value: -0.03
   borderColor:
     m_OverrideState: 1
     m_Value: {r: 1, g: 1, b: 1, a: 1}
@@ -180,6 +180,7 @@ MonoBehaviour:
   - {fileID: 7961328778503769437}
   - {fileID: 7591030262505439511}
   - {fileID: -4952256718840744177}
+  - {fileID: 5192013640843661728}
 --- !u!114 &849379129802519247
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -232,7 +233,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 55f64008ddc7410aa2cdfbb586c089c9, type: 3}
   m_Name: BlockEffect
   m_EditorClassIdentifier: 
-  active: 1
+  active: 0
   factor:
     m_OverrideState: 1
     m_Value: 0
@@ -251,6 +252,52 @@ MonoBehaviour:
   wave:
     m_OverrideState: 1
     m_Value: {x: 1, y: 1, z: -1, w: -1}
+--- !u!114 &5192013640843661728
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db3a2fa341eb9f740b66e364a206b08f, type: 3}
+  m_Name: PixelSort
+  m_EditorClassIdentifier: 
+  active: 1
+  intensity:
+    m_OverrideState: 1
+    m_Value: 0
+  threshold:
+    m_OverrideState: 1
+    m_Value: 0.286
+  thresholdSoftness:
+    m_OverrideState: 1
+    m_Value: 0.001
+  streakLength:
+    m_OverrideState: 1
+    m_Value: 61
+  samples:
+    m_OverrideState: 1
+    m_Value: 24
+  brightnessPower:
+    m_OverrideState: 1
+    m_Value: 1.41
+  breakUp:
+    m_OverrideState: 1
+    m_Value: 0.65
+  horizontal:
+    m_OverrideState: 1
+    m_Value: 0
+  reverse:
+    m_OverrideState: 1
+    m_Value: 0
+  animationAmount:
+    m_OverrideState: 1
+    m_Value: 0.157
+  animationSpeed:
+    m_OverrideState: 1
+    m_Value: 5
 --- !u!114 &7268169518341025599
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -270,19 +317,19 @@ MonoBehaviour:
     m_Value: 0
   monoFactor:
     m_OverrideState: 1
-    m_Value: 0.407
+    m_Value: 0
   pixel:
     m_OverrideState: 1
-    m_Value: 375
+    m_Value: 880
   color:
     m_OverrideState: 1
-    m_Value: 3.09
+    m_Value: 6
   ditherStrength:
     m_OverrideState: 1
     m_Value: 0.37
   maskCount:
     m_OverrideState: 1
-    m_Value: 2
+    m_Value: 0
   paletteColor0:
     m_OverrideState: 1
     m_Value: {r: 0.384, g: 0.776, b: 0.949, a: 1}
