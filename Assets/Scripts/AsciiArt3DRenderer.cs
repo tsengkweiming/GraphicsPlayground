@@ -12,12 +12,14 @@ public class AsciiArt3DParam
     [Range(0f, 0.9f)] public float cellGap = 0.06f;
 
     [Header("Object Depth")]
-    [Range(0.01f, 1f)] public float thickness = 0.2f;
+    [Range(0.01f, 15f)] public float thickness = 0.2f;
     [Range(-50f, 50f)] public float randomDepthOffset = 0.5f;
 
-    [Header("Depth Motion")]
+    [Header("Geometry Motion")] 
+    [Range(0, 1)] public float motionActiveThreshold;
     [Min(0f)] public float depthMotionAmplitude = 0f;
     [Min(0f)] public float depthMotionSpeed = 1f;
+    [Range(-180f, 180f)] public float rotationAmplitude = 0f;
     
     public Texture2D[] textures;
     public string textureBindName;
@@ -38,8 +40,10 @@ public sealed class AsciiArt3DRenderer : ShaderController
     private static readonly int GridColumnsId = Shader.PropertyToID("_GridColumns");
     private static readonly int GridRowsId = Shader.PropertyToID("_GridRows");
     private static readonly int InstanceBaseIndexId = Shader.PropertyToID("_InstanceBaseIndex");
+    private static readonly int MotionActiveThreshold = Shader.PropertyToID("_MotionActiveThreshold");
     private static readonly int DepthMotionAmplitudeId = Shader.PropertyToID("_DepthMotionAmplitude");
     private static readonly int DepthMotionSpeedId = Shader.PropertyToID("_DepthMotionSpeed");
+    private static readonly int RotationAmplitudeId = Shader.PropertyToID("_RotationAmplitude");
 
     [Header("Rendering")]
     [SerializeField] private Mesh mesh;
@@ -186,8 +190,10 @@ public sealed class AsciiArt3DRenderer : ShaderController
         _properties.Clear();
         _properties.SetFloat(GridColumnsId, _columns);
         _properties.SetFloat(GridRowsId, _rows);
+        _properties.SetFloat(MotionActiveThreshold, param.motionActiveThreshold);
         _properties.SetFloat(DepthMotionAmplitudeId, Mathf.Max(0f, param.depthMotionAmplitude));
         _properties.SetFloat(DepthMotionSpeedId, Mathf.Max(0f, param.depthMotionSpeed));
+        _properties.SetFloat(RotationAmplitudeId, param.rotationAmplitude * Mathf.Deg2Rad);
 
         for (var i = 0; i < param.textures.Length; i++)
         {

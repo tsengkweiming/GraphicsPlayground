@@ -30,13 +30,16 @@ Shader "Unlit/Arrow"
             struct appdata
             {
                 float4 vertex : POSITION;
+                float3 normal : NORMAL;
                 float2 uv : TEXCOORD0;
             };
 
             struct v2f
             {
                 float2 uv : TEXCOORD0;
-                UNITY_FOG_COORDS(1)
+                float3 positionOS : TEXCOORD1;
+                float3 normalOS : TEXCOORD2;
+                UNITY_FOG_COORDS(3)
                 float4 vertex : SV_POSITION;
             };
 
@@ -56,6 +59,8 @@ Shader "Unlit/Arrow"
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.positionOS = v.vertex.xyz;
+                o.normalOS = v.normal;
                 UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;
             }
@@ -93,41 +98,83 @@ Shader "Unlit/Arrow"
             {
                 return x - y * floor(x / y);
             }
+
+            // Builds a continuous coordinate around the four vertical faces
+            // of Unity's unit cube (local bounds: -0.5 to +0.5).
+            // U runs +Z -> +X -> -Z -> -X, so it does not reset at the
+            // front/side edges. V is the shared vertical coordinate.
+            float2 cubeSurfaceUV(float3 positionOS, float3 normalOS)
+            {
+                float3 n = normalize(normalOS);
+                float2 surfaceUV;
+                float absX = abs(n.x);
+                float absY = abs(n.y);
+                float absZ = abs(n.z);
+
+                if (absY > max(absX, absZ))
+                {
+                    // Top and bottom cannot both be part of one planar UV
+                    // chart. Keep them stable with a local planar mapping.
+                    surfaceUV = n.y > 0.0
+                        ? float2(positionOS.x + 0.5, positionOS.z + 0.5)
+                        : float2(positionOS.x + 0.5, 0.5 - positionOS.z);
+                }
+                else if (absZ >= absX)
+                {
+                    if (n.z > 0.0)
+                    {
+                        // Front (+Z), U = 0..1.
+                        surfaceUV = float2(positionOS.x + 0.5, positionOS.y + 0.5);
+                    }
+                    else
+                    {
+                        // Back (-Z), U = 2..3.
+                        surfaceUV = float2(2.5 - positionOS.x, positionOS.y + 0.5);
+                    }
+                }
+                else if (n.x > 0.0)
+                {
+                    // Right (+X), U = 1..2.
+                    surfaceUV = float2(1.5 - positionOS.z, positionOS.y + 0.5);
+                }
+                else
+                {
+                    // Left (-X), U = 3..4.
+                    surfaceUV = float2(3.5 + positionOS.z, positionOS.y + 0.5);
+                }
+
+                return surfaceUV;
+            }
             
             fixed4 frag (v2f i) : SV_Target
             {
                 // Normalized pixel coordinates (from -1 to 1)
                 // float2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
-                float2 uv = i.uv;//(2.0 * i.vertex.xy - _ScreenParams.xy) / _ScreenParams.y;
+                float2 uv = cubeSurfaceUV(i.positionOS, i.normalOS);
 
-                float speed = _MotionSpeed; // Motion speed
+                // Keep the animated coordinate on patternUV.x. In vertical
+                // mode, swap the continuous height coordinate into X.
+                float2 patternUV = (_MoveAxis == 0) ? uv : uv.yx;
+
+                float speed = _MotionSpeed;
                 float offset = _Time.y * speed;
-
-                if (_MoveAxis == 0) {
-                    uv.x += offset; // Scroll horizontally
-                } else {
-                    uv.y += offset; // Scroll vertically
-                    
-                    // Rotate UV 90 degrees counter-clockwise 
-                    // (Swaps axes: (x, y) -> (y, -x) so arrow points DOWN)
-                    uv = float2(uv.y, -uv.x); 
-                }
+                patternUV.x += offset;
                 // =========================================================
 
                 // --- 1. CONTROL ARROW COUNT ---
                 float2 count = _Count;
-                uv *= count;
+                patternUV *= count;
 
                 // Grid domain repetition [-0.5, 0.5]
-                uv = frac   (uv + 0.5) - 0.5;
+                patternUV = frac(patternUV + 0.5) - 0.5;
 
                 // Re-center arrow within its grid cell
-                uv.x += 0.4;
+                patternUV.x += 0.4;
 
                 // --- 2. CONTROL ARROW HEAD ANGLE ---
                 float headAngle = _HeadAngle; // Angle in degrees
 
-                float d = sdArrow(uv, headAngle);
+                float d = sdArrow(patternUV, headAngle);
 
                 // Antialiasing
                 float aa = fwidth(d);

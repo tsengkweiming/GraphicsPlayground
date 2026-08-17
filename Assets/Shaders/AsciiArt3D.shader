@@ -19,6 +19,7 @@ Shader "Hidden/ASCII Art 3D"
         _TextureCount ("Texture Pattern Count", Range(0, 10)) = 4
         _PatternColor ("Pattern Color", Color) = (0, 0, 0, 1)
         _PatternBackgroundColor ("Pattern Background Color", Color) = (1, 1, 1, 1)
+        _MotionActiveThreshold ("Motion Active Threshold", Range(0, 1)) = 0
 
         _PosterizeLevels ("Posterize Levels", Range(1, 50)) = 5
         _InputBlack ("Input Black Point", Range(0, 1)) = 0
@@ -43,6 +44,7 @@ Shader "Hidden/ASCII Art 3D"
         [HideInInspector] _InstanceBaseIndex ("Instance Base Index", Float) = 0
         _DepthMotionAmplitude ("Depth Motion Amplitude", Float) = 0
         _DepthMotionSpeed ("Depth Motion Speed", Float) = 1
+        _RotationAmplitude ("Rotation Amplitude (Radians)", Float) = 0
     }
 
     SubShader
@@ -50,24 +52,29 @@ Shader "Hidden/ASCII Art 3D"
         HLSLINCLUDE
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Assets/Shaders/Common/Random.hlsl"
+            #include "Assets/Shaders/Common/Transform.hlsl"
 
-            // Shared by the forward and ShadowCaster passes so animated
-            // geometry and its shadow always use the same motion.
-            float DepthMotion(
-                float instanceId,
-                float instanceBaseIndex,
-                float motionAmplitude,
-                float motionSpeed)
+                float3 RotateInstanceCenter(float3 positionWS, float3 centerWS, float angle)
+                {
+                    return centerWS + mul(RotateZ(angle), positionWS - centerWS);
+                }
+
+            // Shared random state for depth and rotation motion.
+            float3 InstanceMotionData(float instanceId, float instanceBaseIndex, float threshold)
             {
                 float globalIndex = instanceId + max(instanceBaseIndex, 0.0);
                 float hash1 = hash11(globalIndex * 17.13 + 4.71);
-                float motionPhase = hash1 * 6.2831853;
-                float motionFrequency = lerp(0.8, 1.2, hash11(globalIndex * 31.79 + 9.23));
-                float active = step(0.9, hash1);
-
-                return active * sin(_Time.y * motionSpeed * motionFrequency + motionPhase)
-                    * motionAmplitude;
+                float phase = hash1 * 6.2831853;
+                float frequency = lerp(0.8, 1.2, hash11(globalIndex * 31.79 + 9.23));
+                float active = step(threshold, hash1);
+                return float3(active, phase, frequency);
             }
+
+            float InstanceMotionSignal(float3 motionData, float speed)
+            {
+                return motionData.x * sin(_Time.y * speed * motionData.z + motionData.y);
+            }
+
         ENDHLSL
 
         Tags
@@ -97,6 +104,7 @@ Shader "Hidden/ASCII Art 3D"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/Common/Transform.hlsl"
 
             // Shadows.hlsl uses this URP helper, but this lightweight pass does
             // not include the full Lit material include chain.
@@ -185,6 +193,8 @@ Shader "Hidden/ASCII Art 3D"
                 float _InstanceBaseIndex;
                 float _DepthMotionAmplitude;
                 float _DepthMotionSpeed;
+                float _RotationAmplitude;
+                float _MotionActiveThreshold;
             CBUFFER_END
 
             Varyings Vertex(Attributes input)
@@ -200,14 +210,22 @@ Shader "Hidden/ASCII Art 3D"
                 float2 cellId = float2(fmod(globalIndex, columns), floor(globalIndex / columns));
                 float2 gridSize = float2(columns, rows);
 
-                float depthMotion = DepthMotion(
+                float3 motionData = InstanceMotionData(
                     (float)input.instanceID,
                     _InstanceBaseIndex,
-                    _DepthMotionAmplitude,
-                    _DepthMotionSpeed);
+                    _MotionActiveThreshold);
+                float motionSignal = InstanceMotionSignal(motionData, _DepthMotionSpeed);
+                float depthMotion = motionSignal * _DepthMotionAmplitude;
+                float rotationAngle = motionSignal * _RotationAmplitude;
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+                float3 instanceCenterWS = TransformObjectToWorld(float3(0.0, 0.0, 0.0));
+                vertexInput.positionWS = RotateInstanceCenter(
+                    vertexInput.positionWS,
+                    instanceCenterWS,
+                    rotationAngle);
                 VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS);
+                normalInput.normalWS = normalize(mul(RotateZ(rotationAngle), normalInput.normalWS));
                 float3 depthDirectionWS = normalize(TransformObjectToWorldDir(float3(0.0, 0.0, 1.0)));
                 vertexInput.positionWS += depthDirectionWS * depthMotion;
                 vertexInput.positionCS = TransformWorldToHClip(vertexInput.positionWS);
@@ -429,6 +447,8 @@ Shader "Hidden/ASCII Art 3D"
                 float _InstanceBaseIndex;
                 float _DepthMotionAmplitude;
                 float _DepthMotionSpeed;
+                float _RotationAmplitude;
+                float _MotionActiveThreshold;
             CBUFFER_END
 
             struct ShadowAttributes
@@ -443,15 +463,14 @@ Shader "Hidden/ASCII Art 3D"
                 float4 positionCS : SV_POSITION;
             };
 
-            float3 AnimatedShadowPositionWS(ShadowAttributes input)
+            float3 AnimatedShadowPositionWS(
+                ShadowAttributes input,
+                float depthMotion,
+                float rotationAngle)
             {
-                float depthMotion = DepthMotion(
-                    (float)input.instanceID,
-                    _InstanceBaseIndex,
-                    _DepthMotionAmplitude,
-                    _DepthMotionSpeed);
-
                 float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 instanceCenterWS = TransformObjectToWorld(float3(0.0, 0.0, 0.0));
+                positionWS = RotateInstanceCenter(positionWS, instanceCenterWS, rotationAngle);
                 float3 depthDirectionWS = normalize(TransformObjectToWorldDir(float3(0.0, 0.0, 1.0)));
                 return positionWS + depthDirectionWS * depthMotion;
             }
@@ -461,8 +480,17 @@ Shader "Hidden/ASCII Art 3D"
                 ShadowVaryings output;
                 UNITY_SETUP_INSTANCE_ID(input);
 
-                float3 positionWS = AnimatedShadowPositionWS(input);
+                float3 motionData = InstanceMotionData(
+                    (float)input.instanceID,
+                    _InstanceBaseIndex,
+                    _MotionActiveThreshold);
+                float motionSignal = InstanceMotionSignal(motionData, _DepthMotionSpeed);
+                float depthMotion = motionSignal * _DepthMotionAmplitude;
+                float rotationAngle = motionSignal * _RotationAmplitude;
+
+                float3 positionWS = AnimatedShadowPositionWS(input, depthMotion, rotationAngle);
                 float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+                normalWS = normalize(mul(RotateZ(rotationAngle), normalWS));
 
                 #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                     float3 lightDirectionWS = normalize(_LightPosition - positionWS);

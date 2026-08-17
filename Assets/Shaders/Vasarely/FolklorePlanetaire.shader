@@ -3,6 +3,13 @@ Shader "Unlit/FolklorePlanetaire"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        _TileCount ("Tile Count", Float) = 30
+        _PatternCount("Pattern Count", Float) = 1
+        _ColorLow("Color Low", Color) = (5., 0., 40.)
+        _ColorMid1("Color Mid 1", Color) = (30., 80., 20.)
+        _ColorMid2("Color Mid 2", Color) = (210., 20., 60.)
+        _ColorHi("Color High", Color) = (210., 230., 0.)
+        _TexWeight ("Texture Weight", Range(0,1)) = 0
     }
     SubShader
     {
@@ -17,6 +24,7 @@ Shader "Unlit/FolklorePlanetaire"
             // make fog work
             #pragma multi_compile_fog
             #define N_tile 30.
+            #define N_Pattern 5.
 
             #include "UnityCG.cginc"
 
@@ -35,7 +43,14 @@ Shader "Unlit/FolklorePlanetaire"
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
-
+            float _TileCount;
+            float _PatternCount;
+            float3 _ColorLow;
+            float3 _ColorMid1;
+            float3 _ColorMid2;
+            float3 _ColorHi;
+            float _TexWeight;
+            
             float3 mix4ColorGradient(float ratio, float3 start, float3 mid1, float3 mid2, float3 end){
                 return
                 lerp(
@@ -59,22 +74,132 @@ Shader "Unlit/FolklorePlanetaire"
                 return float3(hash(p).x, hash(2.*p).x, hash(3.*p).x);
             }
 
-            float3 make_cell(float2 tile_coord, float2 tile_idx, float3 background_noise){
-                
-                float3 res = float3(0, 0, 0);
-                float length_coord = length(tile_coord);
-                float l_inf_coord = max(abs(tile_coord.x), abs(tile_coord.y));
-                float radius = (0.35 + hash(tile_idx).x*.5)/2.;
-                
-                float activation_int = 1.-smoothstep(radius-0.04, radius+0.04, length_coord);
-                float activation_contour = smoothstep(.47, .5, l_inf_coord);
-                
-                float3 color_int = activation_int*random_color(tile_idx);
-                float3 color_cell = (1.-activation_int)*background_noise*(1.-activation_contour);
-                float3 color_ext = activation_contour*float3(0., 0., 0.);
+            float sdCircle(float2 p, float r)
+            {
+                return length(p) - r;
+            }
 
-                res = color_int+color_cell+color_ext;
-                return res;
+            float sdBox(float2 p, float2 b)
+            {
+                float2 d = abs(p) - b;
+                return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+            }
+
+            float sdDiamond(float2 p, float r)
+            {
+                return abs(p.x) + abs(p.y) - r;
+            }
+
+            float2 rotate2D(float2 p, float angle)
+            {
+                float s = sin(angle);
+                float c = cos(angle);
+
+                return float2(
+                    c * p.x - s * p.y,
+                    s * p.x + c * p.y
+                );
+            }
+            
+            float3 make_cell(
+                float2 tile_coord,
+                float2 tile_idx,
+                float3 background_noise)
+            {
+                float2 p = tile_coord;
+
+                // Stable random values for this cell
+                float2 rnd = hash(tile_idx);
+                float rnd2 = hash(tile_idx + 13.27).x;
+                float rnd3 = hash(tile_idx + 91.13).x;
+
+                // --------------------------------
+                // Per-cell transform
+                // --------------------------------
+
+                // 0 / 90 / 180 / 270 degree rotation
+                float rotationIndex = floor(rnd.y * 4.0);
+                float angle = rotationIndex * 3.14159265 * 0.5;
+
+                p = rotate2D(p, angle);
+
+                // Slight scale variation
+                float scale = lerp(0.75, 1.25, rnd2);
+                p *= scale;
+
+                // --------------------------------
+                // Choose a pattern
+                // --------------------------------
+
+                // float pattern = floor(rnd.x * _PatternCount);
+                float structural = fmod(tile_idx.x + tile_idx.y, 3.0);
+
+                float randomOffset =
+                    floor(hash(floor(tile_idx / 4.0)).x * 3.0);
+
+                float pattern = fmod(
+                    structural + randomOffset,
+                    _PatternCount
+                );
+                float d = 0.0;
+
+                if (pattern < 1.0)
+                {
+                    // Circle
+                    d = sdCircle(p, 0.28);
+                }
+                else if (pattern < 2.0)
+                {
+                    // Square
+                    d = sdBox(p, float2(0.27, 0.27));
+                }
+                else if (pattern < 3.0)
+                {
+                    // Diamond
+                    d = sdDiamond(p, 0.35);
+                }
+                else if (pattern < 4.0)
+                {
+                    // Ring
+                    d = abs(sdCircle(p, 0.27)) - 0.06;
+                }
+                else if (pattern < 5.0)
+                {
+                    // Cross
+                    float d1 = sdBox(p, float2(0.09, 0.32));
+                    float d2 = sdBox(p, float2(0.32, 0.09));
+
+                    d = min(d1, d2);
+                }
+                else
+                {
+                    // Four smaller dots
+                    float2 q = abs(p) - 0.17;
+                    d = sdCircle(q, 0.10);
+                }
+
+                float shape = 1.0 - smoothstep(
+                    -0.015,
+                     0.015,
+                     d
+                );
+
+                // --------------------------------
+                // Cell border
+                // --------------------------------
+
+                float border =
+                    smoothstep(0.44, 0.48,
+                        max(abs(tile_coord.x), abs(tile_coord.y)));
+
+                float3 shapeColor = random_color(tile_idx);
+
+                float3 color =
+                    lerp(background_noise, shapeColor, shape);
+
+                color *= 1.0 - border;
+
+                return color;
             }
 
             // 2D Noise based on Morgan McGuire @morgan3d
@@ -119,6 +244,13 @@ Shader "Unlit/FolklorePlanetaire"
                 return o;
             }
 
+            int GetIndex(float brightness, int numPatterns)
+            {
+                int safeCount = max(numPatterns, 1);
+                int index = (int)floor(saturate(brightness) * safeCount);
+                return clamp(index, 0, safeCount - 1);
+            }
+
             fixed4 frag (v2f i) : SV_Target
             {
                 // Normalized pixel coordinates (from 0 to 1)
@@ -127,8 +259,8 @@ Shader "Unlit/FolklorePlanetaire"
 
                 float2 pos = float2(uv*6.0);
 
-                float2 tile_coord = frac(uv*N_tile)-.5;
-                float2 tile_idx = floor(uv*N_tile)-.5;
+                float2 tile_coord = frac(uv*_TileCount)-.5;
+                float2 tile_idx = floor(uv*_TileCount)-.5;
                 
              
                 // Use the noise function
@@ -137,13 +269,17 @@ Shader "Unlit/FolklorePlanetaire"
                 float2 tmp = sin( float2(0.27+_Time.y/2000.,0.23)*_Time.y + .1*length(tile_idx)*float2(2.1,2.3))+tile_idx*.1;
                 
                 float n = fbm(tmp+fbm(tmp));
+
+                half3 referenceColor = tex2D(_MainTex, saturate(i.uv)).rgb;
+                float brightness = dot(referenceColor, float3(0.299, 0.587, 0.114));
+                float patternIndex = lerp(n, GetIndex(brightness, _PatternCount)/_PatternCount , _TexWeight);//_SampleTex > 0 ? (GetIndex(brightness, _PatternCount)/_PatternCount + n) / 2. : n;
+
+                float3 color_low = _ColorLow; //float3(5., 0., 40.);
+                float3 color_mid1 = _ColorMid1; //float3(30., 80., 20.);
+                float3 color_mid2 = _ColorMid2; //float3(210., 20., 60.);
+                float3 color_high = _ColorHi; //float3(210., 230., 0.);
                 
-                float3 color_low = float3(5., 0., 40.);
-                float3 color_mid1 = float3(30., 80., 20.);
-                float3 color_mid2 = float3(210., 20., 60.);
-                float3 color_high = float3(210., 230., 0.);
-                
-                float3 background_color = mix4ColorGradient(n, color_low, color_mid1, color_mid2, color_high);
+                float3 background_color = mix4ColorGradient(patternIndex, color_low, color_mid1, color_mid2, color_high);
                 background_color = normalize(background_color);
                 
                 float3 color = make_cell(tile_coord, tile_idx, background_color);
