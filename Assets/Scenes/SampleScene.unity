@@ -1250,9 +1250,11 @@ Material:
     - _InputWhite: 1
     - _InstanceBaseIndex: 0
     - _InvertLuma: 0
+    - _MotionActiveThreshold: 0
     - _PatternCount: 5
     - _PhaseSpeed: 0.1
     - _PosterizeLevels: 5
+    - _RotationAmplitude: 0
     - _Saturation: 1
     - _TextureCount: 4
     - _Value: 1
@@ -2736,7 +2738,6 @@ MonoBehaviour:
   _interpolationSpeed: 2
   targetRenderer: {fileID: 474240025}
   textureSequence:
-  - {fileID: 2800000, guid: 63638fd236a5f084496091847e507976, type: 3}
   - {fileID: 2800000, guid: 07930a19f7d218547af41d60dd398aa8, type: 3}
   - {fileID: 2800000, guid: e64474b7e38646e458fb50c1eb9644f4, type: 3}
   - {fileID: 2800000, guid: 24d88378430f24348b3d57648b70273b, type: 3}
@@ -2747,7 +2748,6 @@ MonoBehaviour:
   - {fileID: 2800000, guid: b018fa52a9139514d93cd0fd9378703c, type: 3}
   - {fileID: 2800000, guid: 8e1ca0c80b0df5d49999ee408740c165, type: 3}
   - {fileID: 2800000, guid: 786226b93edb0b041a7dcc32652a73a6, type: 3}
-  - {fileID: 2800000, guid: 34f610f5cf88e0a4f9b3611a861746ef, type: 3}
   - {fileID: 2800000, guid: e8bd3ea610d59df4d8b94da95cb2c6e3, type: 3}
   - {fileID: 2800000, guid: 2ff1a3f482cb06a4689a940059c30184, type: 3}
   - {fileID: 2800000, guid: 53060e23b26d04340b414fba2ac57937, type: 3}
@@ -5865,8 +5865,10 @@ MonoBehaviour:
     cellGap: 0.06
     thickness: 0.2
     randomDepthOffset: 0.1
+    motionActiveThreshold: 1
     depthMotionAmplitude: 0.5
     depthMotionSpeed: 1
+    rotationAmplitude: 0
     textures:
     - {fileID: 2800000, guid: a7e654123a55ab74a8d38c3e80b75063, type: 3}
     - {fileID: 2800000, guid: 86e3409dea8fd1f4b8d77f0099a7216e, type: 3}

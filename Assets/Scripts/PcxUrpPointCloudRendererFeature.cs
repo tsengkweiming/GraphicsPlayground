@@ -69,6 +69,7 @@ public sealed class PcxUrpPointCloudRendererFeature : ScriptableRendererFeature
         {
             profilingSampler = new ProfilingSampler("PCX URP Point Clouds");
             _material = CoreUtils.CreateEngineMaterial(shader);
+            _material.EnableKeyword("_COMPUTE_BUFFER");
         }
 
         public void Setup(LayerMask layerMask)

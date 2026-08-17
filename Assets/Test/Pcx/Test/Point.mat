@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Point Cloud_Point
-  m_Shader: {fileID: 4800000, guid: ad54c0d97e82c664da12fa80927fc2a1, type: 3}
+  m_Name: Point
+  m_Shader: {fileID: 4800000, guid: 1baec256dca7c1642b87d05510e75a3f, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
@@ -27,7 +27,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _Distance: 1
-    - _PointSize: 0.05
+    - _PointSize: 0.03
     m_Colors:
     - _Tint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   m_BuildTextureStacks: []

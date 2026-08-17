@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: PcxUrpPointCloudRendererFeature
   m_EditorClassIdentifier: 
   m_Active: 1
-  _shader: {fileID: 4800000, guid: 3b8c3a3f5d4a4db9a1f0b0c4d7e6f912, type: 3}
+  _shader: {fileID: 4800000, guid: 5d9db4f2a0a9417caefb8d4c6f7318aa, type: 3}
   _renderPassEvent: 300
   _layerMask:
     serializedVersion: 2
