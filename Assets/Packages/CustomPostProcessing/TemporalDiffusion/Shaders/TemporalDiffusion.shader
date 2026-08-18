@@ -20,10 +20,9 @@ Shader "Hidden/GraphicsPlayground/TemporalDiffusion"
             #pragma vertex Vert
             #pragma fragment Frag
 
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+            #include "Assets/Packages/CustomPostProcessing/Shaders/Common/CustomPostProcessing.hlsl"
 
-            TEXTURE2D_X(_HistoryTexture);
+            TEXTURE2D(_HistoryTexture);
 
             float4 _TD_Feedback;  // x: intensity, y: feedback, z: decay, w: motion response
             float4 _TD_Diffusion; // x: radius px, y: heat coefficient, zw: inverse resolution
@@ -32,9 +31,9 @@ Shader "Hidden/GraphicsPlayground/TemporalDiffusion"
 
             float3 SampleHistory(float2 uv, float2 chromaticOffset)
             {
-                float historyR = SAMPLE_TEXTURE2D_X(_HistoryTexture, sampler_LinearClamp, uv + chromaticOffset).r;
-                float historyG = SAMPLE_TEXTURE2D_X(_HistoryTexture, sampler_LinearClamp, uv).g;
-                float historyB = SAMPLE_TEXTURE2D_X(_HistoryTexture, sampler_LinearClamp, uv - chromaticOffset).b;
+                float historyR = SAMPLE_TEXTURE2D(_HistoryTexture, sampler_LinearClamp, uv + chromaticOffset).r;
+                float historyG = SAMPLE_TEXTURE2D(_HistoryTexture, sampler_LinearClamp, uv).g;
+                float historyB = SAMPLE_TEXTURE2D(_HistoryTexture, sampler_LinearClamp, uv - chromaticOffset).b;
                 return float3(historyR, historyG, historyB);
             }
 
@@ -42,8 +41,8 @@ Shader "Hidden/GraphicsPlayground/TemporalDiffusion"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                float2 uv = input.texcoord;
-                half4 source = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv);
+                float2 uv = input.uv;
+                half4 source = GetSource(uv);
                 float2 texel = _TD_Diffusion.zw;
 
                 float phase = _Time.y * _TD_Flow.z;

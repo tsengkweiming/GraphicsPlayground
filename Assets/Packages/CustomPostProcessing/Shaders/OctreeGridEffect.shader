@@ -48,8 +48,8 @@ Shader "Hidden/CustomPostProcess/OctreeGridEffect"
             half4 frag(Varyings input):SV_Target
             {
                 float2 uv = input.uv;
-                float2 asp = _ScaledScreenParams.x / _ScaledScreenParams.y;
-
+                float asp = _ScaledScreenParams.x / _ScaledScreenParams.y;
+                _BeatsPerMinute = 120;
                 float bpm = 4 * 60.0 / _BeatsPerMinute;
                 float cycle = 1e-6 + bpm;
                 float timeMod = fmod(_Time.y, cycle);
@@ -93,8 +93,11 @@ Shader "Hidden/CustomPostProcess/OctreeGridEffect"
                 // return float4(border.xxx,1);
                 // return float4(1 - border.xxx, 1); // white lines, black background
 
+                float2 cellUv = float2(subdiv.cell.x / asp, subdiv.cell.y) * 0.5 + 0.5;
+                cellUv = saturate(cellUv);
+                
                 // return float4(col,1);
-                //return float4(subdiv.hash.xy,0,1);
+                // return float4(subdiv.hash.xy,0,1);
                 // return float4(step(0.5, subdiv.hash.x) * step(0.5, subdiv.hash.y),0,0,1);
                 return float4(_BorderColor * border.xxx,0) + GetSource(lerp(uv, clamp((subdiv.hash.xy + 0.5) * coord * _Size, 0.,1.), _T));
             }

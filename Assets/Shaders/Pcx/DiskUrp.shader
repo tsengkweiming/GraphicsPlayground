@@ -7,7 +7,7 @@ Shader "Point Cloud/DiskUrp"
     Properties
     {
         _Tint("Tint", Color) = (0.5, 0.5, 0.5, 1)
-        _PointSize("Point Size", Float) = 0.05
+        _PointSize("Point Size", Range(0,3)) = 0.05
     }
 
     SubShader

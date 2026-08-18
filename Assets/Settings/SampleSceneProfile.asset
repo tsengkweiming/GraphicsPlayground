@@ -156,6 +156,61 @@ MonoBehaviour:
   rounded:
     m_OverrideState: 0
     m_Value: 0
+--- !u!114 &-212002832455678432
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6dca5cd9fcabf5340b4671c54e37ecb1, type: 3}
+  m_Name: TemporalDiffusion
+  m_EditorClassIdentifier: 
+  active: 1
+  enableEffect:
+    m_OverrideState: 1
+    m_Value: 1
+  intensity:
+    m_OverrideState: 1
+    m_Value: 1
+  feedback:
+    m_OverrideState: 1
+    m_Value: 0.995
+  historyDecay:
+    m_OverrideState: 1
+    m_Value: 0.995
+  diffusionRadius:
+    m_OverrideState: 1
+    m_Value: 6
+  diffusionRate:
+    m_OverrideState: 1
+    m_Value: 0.249
+  chromaticSeparation:
+    m_OverrideState: 1
+    m_Value: 8
+  chromaticDirection:
+    m_OverrideState: 1
+    m_Value: {x: 11.67, y: 7.3}
+  flowStrength:
+    m_OverrideState: 1
+    m_Value: 4
+  flowScale:
+    m_OverrideState: 1
+    m_Value: 12
+  flowSpeed:
+    m_OverrideState: 1
+    m_Value: 2
+  motionResponse:
+    m_OverrideState: 1
+    m_Value: 4
+  cameraCutDistance:
+    m_OverrideState: 0
+    m_Value: 5
+  cameraCutAngle:
+    m_OverrideState: 0
+    m_Value: 50
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -181,6 +236,7 @@ MonoBehaviour:
   - {fileID: 7591030262505439511}
   - {fileID: -4952256718840744177}
   - {fileID: 5192013640843661728}
+  - {fileID: 2950070339343678955}
 --- !u!114 &849379129802519247
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -221,6 +277,61 @@ MonoBehaviour:
   maxNits:
     m_OverrideState: 1
     m_Value: 647
+--- !u!114 &2950070339343678955
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6dca5cd9fcabf5340b4671c54e37ecb1, type: 3}
+  m_Name: TemporalDiffusion
+  m_EditorClassIdentifier: 
+  active: 1
+  enableEffect:
+    m_OverrideState: 0
+    m_Value: 1
+  intensity:
+    m_OverrideState: 0
+    m_Value: 0.9
+  feedback:
+    m_OverrideState: 0
+    m_Value: 0.92
+  historyDecay:
+    m_OverrideState: 0
+    m_Value: 0.995
+  diffusionRadius:
+    m_OverrideState: 0
+    m_Value: 1.25
+  diffusionRate:
+    m_OverrideState: 0
+    m_Value: 0.18
+  chromaticSeparation:
+    m_OverrideState: 0
+    m_Value: 1.4
+  chromaticDirection:
+    m_OverrideState: 0
+    m_Value: {x: 1, y: 0.35}
+  flowStrength:
+    m_OverrideState: 0
+    m_Value: 0.45
+  flowScale:
+    m_OverrideState: 0
+    m_Value: 3
+  flowSpeed:
+    m_OverrideState: 0
+    m_Value: 0.2
+  motionResponse:
+    m_OverrideState: 0
+    m_Value: 3
+  cameraCutDistance:
+    m_OverrideState: 0
+    m_Value: 5
+  cameraCutAngle:
+    m_OverrideState: 0
+    m_Value: 50
 --- !u!114 &4548338353279215947
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -513,3 +624,51 @@ MonoBehaviour:
   bladeRotation:
     m_OverrideState: 1
     m_Value: 0
+--- !u!114 &8238609763397723301
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b88164364c213f94fbb2670e430c9d23, type: 3}
+  m_Name: DiffusionBlur
+  m_EditorClassIdentifier: 
+  active: 1
+  <displayName>k__BackingField: 
+  mMaterial: {fileID: 0}
+  mCopyMaterial: {fileID: 0}
+  mSourceTextureId: 1025
+  diffusionRate:
+    <fieldHash>k__BackingField: 648859064
+    m_OverrideState: 1
+    m_Value: 0.679
+  historyBlend:
+    <fieldHash>k__BackingField: 888209456
+    m_OverrideState: 1
+    m_Value: 0.629
+  trailRadius:
+    <fieldHash>k__BackingField: 1127559848
+    m_OverrideState: 1
+    m_Value: 1
+  chromaOffset:
+    <fieldHash>k__BackingField: 1366910240
+    m_OverrideState: 1
+    m_Value: 0
+  showHistory:
+    <fieldHash>k__BackingField: 1606260632
+    m_OverrideState: 0
+    m_Value: 0
+  debugMode:
+    <fieldHash>k__BackingField: 1845611024
+    m_OverrideState: 1
+    m_Value: 0
+  freezeHistory:
+    <fieldHash>k__BackingField: -1491954704
+    m_OverrideState: 1
+    m_Value: 0
+  mHistoryDescriptorValid: 0
+  mHistoryValid: 0
+  mPingIsPrevious: 0
