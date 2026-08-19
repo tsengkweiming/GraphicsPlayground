@@ -17,27 +17,33 @@ Shader "Hidden/CustomPostProcess/OctreeGridEffect"
             HLSLPROGRAM
             #include "Common/CustomPostProcessing.hlsl"
             #include "Common/OctreeGrid.hlsl"
-            #include "Common/Noise/SimplexNoise3D.cginc"
 
             #pragma vertex Vert
             #pragma fragment frag
-            
+
+            // Runtime controls supplied by OctreeGridEffect.cs.
             float _T;
             float _Size;
             float _Z;
             float _Z2;
-            float _BeatsPerMinute;
             float _BorderRate;
+            float _SubdivisionStopThreshold;
+            int _CellCount;
+            float3 _CellSize;
             float4 _BorderColor;
+
             // Pseudo-random generator based on a seed
-            float random1to1(float seed) {
+            float random1to1(float seed)
+            {
                 return frac(sin(seed * 12.9898) * 43758.5453);
             }
             
             float gridOutline(float3 p, float3 cellSize, float lineWidth)
             {
-                float3 localPos = abs(fmod(p + 0.5 * cellSize, cellSize) - 0.5 * cellSize);
-                float3 halfSize = 0.5 * cellSize;
+                float3 safeCellSize = max(abs(cellSize), GRID_EPSILON);
+                float3 localPos = abs(fmod(p + 0.5 * safeCellSize, safeCellSize)
+                                    - 0.5 * safeCellSize);
+                float3 halfSize = 0.5 * safeCellSize;
                 float3 edgeDist = halfSize - localPos;
 
                 // Thin line around each axis-aligned boundary
@@ -49,8 +55,8 @@ Shader "Hidden/CustomPostProcess/OctreeGridEffect"
             {
                 float2 uv = input.uv;
                 float asp = _ScaledScreenParams.x / _ScaledScreenParams.y;
-                _BeatsPerMinute = 120;
-                float bpm = 4 * 60.0 / _BeatsPerMinute;
+                const float beatsPerMinute = 120.0;
+                float bpm = 4.0 * 60.0 / beatsPerMinute; // / _BeatsPerMinute;
                 float cycle = 1e-6 + bpm;
                 float timeMod = fmod(_Time.y, cycle);
                 float seed = floor(_Time.y / cycle);
@@ -70,36 +76,28 @@ Shader "Hidden/CustomPostProcess/OctreeGridEffect"
                 
                 float2 p = coord * 2.0 - 1.0;
                 p.x *= asp;
-
-                float z = _Z;//6.25, 4.25 4.75 // -0.04~-0.3
-
-                float3 col = float3( 0.0, 0.0, 0.0 );
-
+                
                 // fill the cell at the pixel
-                SubdivResult subdiv = subdivision( float3( p, z ) );
-                //col = subdiv.hash;
-                // float2 newUv = clamp((subdiv.hash.xy + 0.5) * uv * _Size, 0.,1.);
-                // if (newUv.x > 0.4 && newUv.x < 0.5 && newUv.y > 0.4 && newUv.y < 0.5)
-                //     col = float3(1,0,0);
+                SubdivResult subdiv = subdivision(
+                    float3(p, _Z),
+                    _CellSize,
+                    _CellCount,
+                    _SubdivisionStopThreshold);
 
                 float3 pos = float3(p, lerp(0,_Z2, pulse));
-                float3 newSize = _Size;
-                // newSize.z = lerp(1, 0, pulse);
-                // float shouldDraw = step(_BorderRate, subdiv.hash.x); // 1 if hash.x < rate, else 0
-                // shouldDraw = step(0.15, subdiv.hash.x) * step(subdiv.hash.y, 0.3);
                 float shouldDraw = step(subdiv.hash.z, _BorderRate);
-                float border = gridOutline(pos + float3(1.75,1,0), subdiv.size * newSize, 0.001) * shouldDraw; // 0.01 is line width
-                // border = lerp(0, border, pulse);
-                // return float4(border.xxx,1);
-                // return float4(1 - border.xxx, 1); // white lines, black background
+                float border = gridOutline(
+                    pos + float3(1.75, 1.0, 0.0),
+                    subdiv.size * _Size,
+                    0.001) * shouldDraw;
 
-                float2 cellUv = float2(subdiv.cell.x / asp, subdiv.cell.y) * 0.5 + 0.5;
-                cellUv = saturate(cellUv);
-                
-                // return float4(col,1);
-                // return float4(subdiv.hash.xy,0,1);
-                // return float4(step(0.5, subdiv.hash.x) * step(0.5, subdiv.hash.y),0,0,1);
-                return float4(_BorderColor * border.xxx,0) + GetSource(lerp(uv, clamp((subdiv.hash.xy + 0.5) * coord * _Size, 0.,1.), _T));
+                float2 sampleUv = clamp(
+                    (subdiv.hash.xy + 0.5) * coord * _Size,
+                    0.0,
+                    1.0);
+                half4 color = GetSource(lerp(uv, sampleUv, _T));
+                color.rgb += (half3)_BorderColor.rgb * border;
+                return color;
             }
             ENDHLSL
         }
