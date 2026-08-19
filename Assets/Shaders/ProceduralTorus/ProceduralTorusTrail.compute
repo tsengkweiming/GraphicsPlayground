@@ -1,0 +1,150 @@
+#pragma kernel InitializeSegments
+#pragma kernel AnimateSegments
+#pragma kernel TessellateVertices
+
+#include "../../Shaders/Common/Noise.hlsl"
+
+struct SegmentData
+{
+    float3 initialPosition;
+    float3 position;
+    float3 direction;
+    float3 normal;
+};
+
+struct VertexData
+{
+    float3 position;
+    float3 normal;
+    float2 uv;
+};
+
+StructuredBuffer<float3> _InitialPositionBuffer;
+RWStructuredBuffer<SegmentData> _SegmentBuffer;
+RWStructuredBuffer<VertexData> _VertexBuffer;
+
+int _MaxSegment;
+int _SidesPerRing;
+float _TubeRadius;
+float _VisibleLength;
+float _CenterlineNoiseScale;
+float _CenterlineStep;
+float _MotionAmplitude;
+float _MotionFrequency;
+float _MotionSpatialScale;
+float _MotionSpeed;
+float _TrailTime;
+float _NoiseSeed;
+int _TrailCount;
+int _TotalSegmentCount;
+int _TotalVertexCount;
+float3 _Position;
+
+static const float kEpsilon = 1e-5;
+
+float3 CurlNoise(float3 p)
+{
+    const float derivativeStep = 0.01;
+    float3 curl = float3(
+        curlX(p, derivativeStep),
+        curlY(p, derivativeStep),
+        curlZ(p, derivativeStep));
+
+    return curl * rsqrt(max(dot(curl, curl), kEpsilon));
+}
+
+float3 BuildFrameNormal(float3 direction, float3 previousNormal)
+{
+    float3 projected = previousNormal - direction * dot(previousNormal, direction);
+    float projectedLength = length(projected);
+
+    if (projectedLength < kEpsilon)
+    {
+        float3 fallback = abs(direction.y) < 0.95 ? float3(0, 1, 0) : float3(1, 0, 0);
+        projected = cross(direction, fallback);
+    }
+
+    return normalize(projected);
+}
+
+[numthreads(64, 1, 1)]
+void InitializeSegments(uint trailIndex : SV_DispatchThreadID)
+{
+    if (trailIndex >= (uint)_TrailCount)
+        return;
+
+    int ringCount = _MaxSegment + 1;
+    float3 previousPosition = _InitialPositionBuffer[trailIndex];
+    float3 previousNormal = float3(0, 1, 0);
+
+    for (int segmentIndex = 0; segmentIndex < ringCount; segmentIndex++)
+    {
+        int bufferIndex = (int)trailIndex * ringCount + segmentIndex;
+        float3 samplePosition = (previousPosition + float3(trailIndex * 0.02, _NoiseSeed * 0.013, segmentIndex * 0.001)) * _CenterlineNoiseScale;
+        float3 position = previousPosition + CurlNoise(samplePosition) * _CenterlineStep;
+        float3 direction = normalize(previousPosition - position);
+
+        if (length(direction) < kEpsilon)
+            direction = float3(0, -1, 0);
+
+        float3 normal = BuildFrameNormal(direction, previousNormal);
+
+        SegmentData segment;
+        segment.initialPosition = position;
+        segment.position = position;
+        segment.direction = direction;
+        segment.normal = normal;
+        _SegmentBuffer[bufferIndex] = segment;
+
+        previousPosition = position;
+        previousNormal = normal;
+    }
+}
+
+[numthreads(64, 1, 1)]
+void AnimateSegments(uint segmentIndex : SV_DispatchThreadID)
+{
+    if (segmentIndex >= (uint)_TotalSegmentCount)
+        return;
+
+    SegmentData segment = _SegmentBuffer[segmentIndex];
+    int ringCount = _MaxSegment + 1;
+    int trailIndex = (int)segmentIndex / ringCount;
+
+    float3 samplePosition = float3(
+        segment.initialPosition.xy * _MotionSpatialScale + trailIndex * 0.013,
+        _TrailTime * _MotionSpeed + _NoiseSeed * 0.001);
+
+    float motion = snoise(samplePosition) * _MotionAmplitude * _MotionFrequency;
+    segment.position = segment.initialPosition + segment.normal * motion;
+    _SegmentBuffer[segmentIndex] = segment;
+}
+
+[numthreads(64, 1, 1)]
+void TessellateVertices(uint vertexIndex : SV_DispatchThreadID)
+{
+    if (vertexIndex >= (uint)_TotalVertexCount)
+        return;
+
+    uint ringCount = (uint)(_MaxSegment + 1);
+    uint sidesPerRing = (uint)_SidesPerRing;
+    uint verticesPerTrail = ringCount * sidesPerRing;
+    uint trailIndex = (uint)floor(vertexIndex / (float)verticesPerTrail);
+    uint localVertexIndex = vertexIndex - trailIndex * verticesPerTrail;
+    uint segmentIndex = (uint)floor(localVertexIndex / (float)sidesPerRing);
+    uint sideIndex = localVertexIndex - segmentIndex * sidesPerRing;
+
+    int lastVisibleSegment = clamp((int)floor(saturate(_VisibleLength) * _MaxSegment), 0, _MaxSegment);
+    int sourceSegment = min((int)segmentIndex, lastVisibleSegment);
+    SegmentData segment = _SegmentBuffer[trailIndex * ringCount + (uint)sourceSegment];
+
+    float sideT = sideIndex / (float)sidesPerRing;
+    float angle = sideT * 6.28318530718;
+    float3 radial = segment.normal * cos(angle) + normalize(cross(segment.direction, segment.normal)) * sin(angle);
+
+    VertexData vertex;
+    vertex.position = segment.position + radial * _TubeRadius;
+    vertex.normal = normalize(radial);
+    vertex.uv = float2(segmentIndex / (float)_MaxSegment, sideT);
+    _VertexBuffer[vertexIndex] = vertex;
+}
