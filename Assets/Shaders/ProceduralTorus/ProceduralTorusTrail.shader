@@ -9,6 +9,9 @@ Shader "GraphicsPlayground/Procedural/Torus Trail"
         _PulseSpeed("Pulse Speed", Float) = 0.1
         _PulseWidth("Pulse Width", Range(0.001, 1)) = 0.1
         _PulseIntensity("Pulse Intensity", Float) = 1
+        _PulseSegmentPhase("Pulse Segment Phase", Float) = 0.16
+        _PulseTrailPhase("Pulse Trail Phase", Float) = 0.002
+        _PulseDarkBrightness("Pulse Dark Brightness", Range(0, 1)) = 0.15
         _PaletteWaveSpeed("Palette Wave Speed", Float) = 0.5
         _PaletteSegmentPhase("Palette Segment Phase", Float) = 0.75
         _PaletteTrailPhase("Palette Trail Phase", Float) = 0.001
@@ -62,6 +65,9 @@ Shader "GraphicsPlayground/Procedural/Torus Trail"
                 float _PulseSpeed;
                 float _PulseWidth;
                 float _PulseIntensity;
+                float _PulseSegmentPhase;
+                float _PulseTrailPhase;
+                float _PulseDarkBrightness;
                 float _PaletteWaveSpeed;
                 float _PaletteSegmentPhase;
                 float _PaletteTrailPhase;
@@ -82,6 +88,7 @@ Shader "GraphicsPlayground/Procedural/Torus Trail"
                 float3 normalWS : TEXCOORD1;
                 float3 color : TEXCOORD2;
                 float trailT : TEXCOORD3;
+                float pulsePhase : TEXCOORD4;
             };
 
             Varyings Vert(Attributes input)
@@ -97,6 +104,7 @@ Shader "GraphicsPlayground/Procedural/Torus Trail"
                 output.positionWS = positionInputs.positionWS;
                 output.normalWS = TransformObjectToWorldNormal(vertex.normal);
                 output.trailT = vertex.uv.x;
+                output.pulsePhase = input.instanceID * _PulseTrailPhase + vertex.uv.x * _PulseSegmentPhase;
 
                 float paletteT = 0.5 + 0.5 * sin(
                     _Time.y * _PaletteWaveSpeed +
@@ -118,10 +126,16 @@ Shader "GraphicsPlayground/Procedural/Torus Trail"
                 half specular = pow(saturate(dot(normalWS, halfVector)), 32);
                 half rim = pow(1 - saturate(dot(normalWS, viewDirection)), _RimPower);
 
-                float pulsePosition = frac(input.trailT - _Time.y * _PulseSpeed);
-                float pulseDistance = abs(pulsePosition - 0.5) * 2;
-                half pulse = 1 - smoothstep(0, _PulseWidth, pulseDistance);
-                half brightness = 1 + pulse * _PulseIntensity;
+                // The original shader used the global segment index. Because
+                // that index included the instance offset, every trail had a
+                // different dark/bright phase. Reconstruct that behavior with
+                // explicit local-segment and per-trail phase terms.
+                float pulsePosition = frac(
+                    input.pulsePhase +
+                    _Time.y * _PulseSpeed);
+                half brightBand = 1 - smoothstep(0, _PulseWidth, pulsePosition);
+                half brightValue = 1.3 * _PulseIntensity;
+                half brightness = lerp(_PulseDarkBrightness, brightValue, brightBand);
 
                 half3 baseColor = input.color * _BaseColor.rgb * brightness;
                 half3 directLight = mainLight.color * lerp(0.25, 1, diffuse);

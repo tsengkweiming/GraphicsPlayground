@@ -1,5 +1,6 @@
 #pragma kernel InitializeSegments
 #pragma kernel AnimateSegments
+#pragma kernel SmoothSegments
 #pragma kernel TessellateVertices
 
 #include "../../Shaders/Common/Noise.hlsl"
@@ -8,6 +9,7 @@ struct SegmentData
 {
     float3 initialPosition;
     float3 position;
+    float3 velocity;
     float3 direction;
     float3 normal;
 };
@@ -21,6 +23,7 @@ struct VertexData
 
 StructuredBuffer<float3> _InitialPositionBuffer;
 RWStructuredBuffer<SegmentData> _SegmentBuffer;
+RWStructuredBuffer<SegmentData> _AdvectedSegmentBuffer;
 RWStructuredBuffer<VertexData> _VertexBuffer;
 
 int _MaxSegment;
@@ -29,28 +32,41 @@ float _TubeRadius;
 float _VisibleLength;
 float _CenterlineNoiseScale;
 float _CenterlineStep;
-float _MotionAmplitude;
-float _MotionFrequency;
-float _MotionSpatialScale;
-float _MotionSpeed;
 float _TrailTime;
 float _NoiseSeed;
 int _TrailCount;
 int _TotalSegmentCount;
 int _TotalVertexCount;
 float3 _Position;
+float _DeltaTime;
+float _CurlConvergence;
+float _CurlViscosity;
+float _CurlReturnStrength;
+float3 _CurlAdditionalVector;
+float _PositionSmoothing;
+float _VelocitySmoothing;
 
 static const float kEpsilon = 1e-5;
+static const float kCurlEpsilon = 1e-3;
 
 float3 CurlNoise(float3 p)
 {
-    const float derivativeStep = 0.01;
-    float3 curl = float3(
-        curlX(p, derivativeStep),
-        curlY(p, derivativeStep),
-        curlZ(p, derivativeStep));
+    float3 dx = float3(kCurlEpsilon, 0.0, 0.0);
+    float3 dy = float3(0.0, kCurlEpsilon, 0.0);
+    float3 dz = float3(0.0, 0.0, kCurlEpsilon);
 
-    return curl * rsqrt(max(dot(curl, curl), kEpsilon));
+    float3 dpdx0 = snoise3D(p - dx);
+    float3 dpdx1 = snoise3D(p + dx);
+    float3 dpdy0 = snoise3D(p - dy);
+    float3 dpdy1 = snoise3D(p + dy);
+    float3 dpdz0 = snoise3D(p - dz);
+    float3 dpdz1 = snoise3D(p + dz);
+
+    float x = dpdy1.z - dpdy0.z + dpdz1.y - dpdz0.y;
+    float y = dpdz1.x - dpdz0.x + dpdx1.z - dpdx0.z;
+    float z = dpdx1.y - dpdx0.y + dpdy1.x - dpdy0.x;
+
+    return float3(x, y, z) / kCurlEpsilon * 2.0;
 }
 
 float3 BuildFrameNormal(float3 direction, float3 previousNormal)
@@ -92,6 +108,7 @@ void InitializeSegments(uint trailIndex : SV_DispatchThreadID)
         SegmentData segment;
         segment.initialPosition = position;
         segment.position = position;
+        segment.velocity = 0.0;
         segment.direction = direction;
         segment.normal = normal;
         _SegmentBuffer[bufferIndex] = segment;
@@ -108,15 +125,62 @@ void AnimateSegments(uint segmentIndex : SV_DispatchThreadID)
         return;
 
     SegmentData segment = _SegmentBuffer[segmentIndex];
-    int ringCount = _MaxSegment + 1;
-    int trailIndex = (int)segmentIndex / ringCount;
+    float dt = min(max(_DeltaTime, 0.0), 0.0333);
 
-    float3 samplePosition = float3(
-        segment.initialPosition.xy * _MotionSpatialScale + trailIndex * 0.013,
-        _TrailTime * _MotionSpeed + _NoiseSeed * 0.001);
+    // This follows the reference particle solver: curl is a force field,
+    // velocity persists between frames, and position is advected by velocity.
+    float3 fieldPosition = segment.position * dt * _CurlConvergence;
+    float3 force = CurlNoise(fieldPosition) - segment.velocity;
+    force += (segment.initialPosition - segment.position) * _CurlReturnStrength;
+    force += _CurlAdditionalVector;
 
-    float motion = snoise(samplePosition) * _MotionAmplitude * _MotionFrequency;
-    segment.position = segment.initialPosition + segment.normal * motion;
+    float warmup = saturate(_TrailTime * 0.5);
+    segment.velocity += force * dt * _CurlViscosity * warmup;
+    segment.position += segment.velocity * dt;
+    _AdvectedSegmentBuffer[segmentIndex] = segment;
+}
+
+[numthreads(64, 1, 1)]
+void SmoothSegments(uint segmentIndex : SV_DispatchThreadID)
+{
+    if (segmentIndex >= (uint)_TotalSegmentCount)
+        return;
+
+    uint ringCount = (uint)(_MaxSegment + 1);
+    uint localIndex = segmentIndex % ringCount;
+    uint lastIndex = ringCount - 1;
+
+    SegmentData segment = _AdvectedSegmentBuffer[segmentIndex];
+    SegmentData previousSegment = _AdvectedSegmentBuffer[
+        localIndex > 0 ? segmentIndex - 1 : segmentIndex];
+    SegmentData nextSegment = _AdvectedSegmentBuffer[
+        localIndex < lastIndex ? segmentIndex + 1 : segmentIndex];
+
+    if (localIndex > 0 && localIndex < lastIndex)
+    {
+        float3 neighborPosition =
+            (previousSegment.position + nextSegment.position) * 0.5;
+        float3 neighborVelocity =
+            (previousSegment.velocity + nextSegment.velocity) * 0.5;
+
+        segment.position = lerp(
+            segment.position,
+            neighborPosition,
+            saturate(_PositionSmoothing));
+        segment.velocity = lerp(
+            segment.velocity,
+            neighborVelocity,
+            saturate(_VelocitySmoothing));
+    }
+
+    // The original frame cannot be reused after independent advection. Rebuild
+    // the tangent and project the old normal onto its new tangent plane.
+    float3 direction = previousSegment.position - nextSegment.position;
+    float directionLengthSq = dot(direction, direction);
+    if (directionLengthSq > kEpsilon)
+        segment.direction = direction * rsqrt(directionLengthSq);
+
+    segment.normal = BuildFrameNormal(segment.direction, segment.normal);
     _SegmentBuffer[segmentIndex] = segment;
 }
 

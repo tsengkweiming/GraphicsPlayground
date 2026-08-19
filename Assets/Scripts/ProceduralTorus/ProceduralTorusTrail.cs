@@ -17,6 +17,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     {
         public Vector3 initialPosition;
         public Vector3 position;
+        public Vector3 velocity;
         public Vector3 direction;
         public Vector3 normal;
     }
@@ -47,11 +48,15 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     [Min(0.0001f)] [SerializeField] private float centerlineNoiseScale = 0.01f;
     [Min(0f)] [SerializeField] private float centerlineStep = 2f;
 
-    [Header("Motion")]
-    [Min(0f)] [SerializeField] private float motionAmplitude = 1f;
-    [Min(0f)] [SerializeField] private float motionFrequency = 0.08f;
-    [Min(0.0001f)] [SerializeField] private float motionSpatialScale = 0.07f;
-    [Min(0f)] [SerializeField] private float motionSpeed = 1f;
+    [Header("Curl Noise Flow")]
+    [Min(0f)] [SerializeField] private float curlConvergence = 1f;
+    [Min(0f)] [SerializeField] private float curlViscosity = 1f;
+    [Min(0f)] [SerializeField] private float curlReturnStrength = 0.05f;
+    [SerializeField] private Vector3 curlAdditionalVector;
+
+    [Header("Trail Smoothing")]
+    [Range(0f, 1f)] [SerializeField] private float positionSmoothing = 0.65f;
+    [Range(0f, 1f)] [SerializeField] private float velocitySmoothing = 0.5f;
 
     [Header("Color")]
     [SerializeField] private Gradient[] gradients = new Gradient[0];
@@ -69,9 +74,13 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     [Min(0f)] [SerializeField] private float pulseSpeed = 0.1f;
     [Range(0.001f, 1f)] [SerializeField] private float pulseWidth = 0.1f;
     [Min(0f)] [SerializeField] private float pulseIntensity = 1f;
+    [Min(0f)] [SerializeField] private float pulsePhasePerSegment = 0.001f;
+    [Min(0f)] [SerializeField] private float pulsePhasePerTrail = 0.002f;
+    [Range(0f, 1f)] [SerializeField] private float pulseDarkBrightness = 0.15f;
 
     private static readonly int InitialPositionBufferId = Shader.PropertyToID("_InitialPositionBuffer");
     private static readonly int SegmentBufferId = Shader.PropertyToID("_SegmentBuffer");
+    private static readonly int AdvectedSegmentBufferId = Shader.PropertyToID("_AdvectedSegmentBuffer");
     private static readonly int VertexBufferId = Shader.PropertyToID("_VertexBuffer");
     private static readonly int IndexBufferId = Shader.PropertyToID("_IndexBuffer");
     private static readonly int PaletteBufferId = Shader.PropertyToID("_Palette");
@@ -81,11 +90,14 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     private static readonly int VisibleLengthId = Shader.PropertyToID("_VisibleLength");
     private static readonly int CenterlineNoiseScaleId = Shader.PropertyToID("_CenterlineNoiseScale");
     private static readonly int CenterlineStepId = Shader.PropertyToID("_CenterlineStep");
-    private static readonly int MotionAmplitudeId = Shader.PropertyToID("_MotionAmplitude");
-    private static readonly int MotionFrequencyId = Shader.PropertyToID("_MotionFrequency");
-    private static readonly int MotionSpatialScaleId = Shader.PropertyToID("_MotionSpatialScale");
-    private static readonly int MotionSpeedId = Shader.PropertyToID("_MotionSpeed");
+    private static readonly int CurlConvergenceId = Shader.PropertyToID("_CurlConvergence");
+    private static readonly int CurlViscosityId = Shader.PropertyToID("_CurlViscosity");
+    private static readonly int CurlReturnStrengthId = Shader.PropertyToID("_CurlReturnStrength");
+    private static readonly int CurlAdditionalVectorId = Shader.PropertyToID("_CurlAdditionalVector");
+    private static readonly int PositionSmoothingId = Shader.PropertyToID("_PositionSmoothing");
+    private static readonly int VelocitySmoothingId = Shader.PropertyToID("_VelocitySmoothing");
     private static readonly int CurrentTimeId = Shader.PropertyToID("_TrailTime");
+    private static readonly int DeltaTimeId = Shader.PropertyToID("_DeltaTime");
     private static readonly int NoiseSeedId = Shader.PropertyToID("_NoiseSeed");
     private static readonly int VerticesPerTrailId = Shader.PropertyToID("_VerticesPerTrail");
     private static readonly int PaletteSizeId = Shader.PropertyToID("_PaletteSize");
@@ -96,6 +108,9 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     private static readonly int PulseSpeedId = Shader.PropertyToID("_PulseSpeed");
     private static readonly int PulseWidthId = Shader.PropertyToID("_PulseWidth");
     private static readonly int PulseIntensityId = Shader.PropertyToID("_PulseIntensity");
+    private static readonly int PulseSegmentPhaseId = Shader.PropertyToID("_PulseSegmentPhase");
+    private static readonly int PulseTrailPhaseId = Shader.PropertyToID("_PulseTrailPhase");
+    private static readonly int PulseDarkBrightnessId = Shader.PropertyToID("_PulseDarkBrightness");
     private static readonly int PaletteWaveSpeedId = Shader.PropertyToID("_PaletteWaveSpeed");
     private static readonly int PaletteSegmentPhaseId = Shader.PropertyToID("_PaletteSegmentPhase");
     private static readonly int PaletteTrailPhaseId = Shader.PropertyToID("_PaletteTrailPhase");
@@ -108,6 +123,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
 
     private ComputeBuffer initialPositionBuffer;
     private ComputeBuffer segmentBuffer;
+    private ComputeBuffer advectedSegmentBuffer;
     private ComputeBuffer vertexBuffer;
     private ComputeBuffer indexBuffer;
     private ComputeBuffer paletteBuffer;
@@ -117,6 +133,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     private Vector4[] palette;
     private int initializeKernel;
     private int animateKernel;
+    private int smoothKernel;
     private int tessellateKernel;
     private bool initialized;
     private bool buffersDirty = true;
@@ -142,7 +159,9 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
             return;
 
         UpdatePalette();
+        BindComputeBuffers();
         AnimateSegments();
+        SmoothSegments();
         TessellateVertices();
     }
 
@@ -223,6 +242,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         _trailMaterial = new Material(trailShader);
         initializeKernel = trailCompute.FindKernel("InitializeSegments");
         animateKernel = trailCompute.FindKernel("AnimateSegments");
+        smoothKernel = trailCompute.FindKernel("SmoothSegments");
         tessellateKernel = trailCompute.FindKernel("TessellateVertices");
     }
 
@@ -276,6 +296,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     {
         initialPositionBuffer = new ComputeBuffer(initialPositions.Length, Marshal.SizeOf<Vector3>(), ComputeBufferType.Structured);
         segmentBuffer = new ComputeBuffer(SegmentsTotal, Marshal.SizeOf<SegmentData>(), ComputeBufferType.Structured);
+        advectedSegmentBuffer = new ComputeBuffer(SegmentsTotal, Marshal.SizeOf<SegmentData>(), ComputeBufferType.Structured);
         vertexBuffer = new ComputeBuffer(VerticesTotal, Marshal.SizeOf<VertexData>(), ComputeBufferType.Structured);
         indexBuffer = new ComputeBuffer(indices.Length, sizeof(int), ComputeBufferType.Structured);
         paletteBuffer = new ComputeBuffer(paletteResolution, Marshal.SizeOf<Vector4>(), ComputeBufferType.Structured);
@@ -290,6 +311,10 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         trailCompute.SetBuffer(initializeKernel, SegmentBufferId, segmentBuffer);
 
         trailCompute.SetBuffer(animateKernel, SegmentBufferId, segmentBuffer);
+        trailCompute.SetBuffer(animateKernel, AdvectedSegmentBufferId, advectedSegmentBuffer);
+
+        trailCompute.SetBuffer(smoothKernel, AdvectedSegmentBufferId, advectedSegmentBuffer);
+        trailCompute.SetBuffer(smoothKernel, SegmentBufferId, segmentBuffer);
 
         trailCompute.SetBuffer(tessellateKernel, SegmentBufferId, segmentBuffer);
         trailCompute.SetBuffer(tessellateKernel, VertexBufferId, vertexBuffer);
@@ -297,6 +322,9 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
 
     private void InitializeSegments()
     {
+        trailCompute.SetBuffer(initializeKernel, InitialPositionBufferId, initialPositionBuffer);
+        trailCompute.SetBuffer(initializeKernel, SegmentBufferId, segmentBuffer);
+
         trailCompute.SetInt(TrailCountId, trailCount);
         trailCompute.SetInt(MaxSegmentId, segmentsPerTrail);
         trailCompute.SetInt(SidesPerRingId, sidesPerRing);
@@ -308,18 +336,39 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
 
     private void AnimateSegments()
     {
+        // Compute buffer bindings are per-kernel and can be cleared when Unity
+        // recompiles the compute shader in the Editor.
+        trailCompute.SetBuffer(animateKernel, SegmentBufferId, segmentBuffer);
+        trailCompute.SetBuffer(animateKernel, AdvectedSegmentBufferId, advectedSegmentBuffer);
+
         trailCompute.SetInt(TotalSegmentCountId, SegmentsTotal);
-        trailCompute.SetFloat(MotionAmplitudeId, motionAmplitude);
-        trailCompute.SetFloat(MotionFrequencyId, motionFrequency);
-        trailCompute.SetFloat(MotionSpatialScaleId, motionSpatialScale);
-        trailCompute.SetFloat(MotionSpeedId, motionSpeed);
+        trailCompute.SetFloat(CurlConvergenceId, curlConvergence);
+        trailCompute.SetFloat(CurlViscosityId, curlViscosity);
+        trailCompute.SetFloat(CurlReturnStrengthId, curlReturnStrength);
+        trailCompute.SetVector(CurlAdditionalVectorId, curlAdditionalVector);
+        trailCompute.SetFloat(DeltaTimeId, Time.deltaTime);
         trailCompute.SetFloat(CurrentTimeId, Time.time);
         trailCompute.SetFloat(NoiseSeedId, seed);
         trailCompute.Dispatch(animateKernel, DivideRoundUp(SegmentsTotal, ComputeThreadGroupSize), 1, 1);
     }
 
+    private void SmoothSegments()
+    {
+        trailCompute.SetBuffer(smoothKernel, AdvectedSegmentBufferId, advectedSegmentBuffer);
+        trailCompute.SetBuffer(smoothKernel, SegmentBufferId, segmentBuffer);
+
+        trailCompute.SetInt(TotalSegmentCountId, SegmentsTotal);
+        trailCompute.SetInt(MaxSegmentId, segmentsPerTrail);
+        trailCompute.SetFloat(PositionSmoothingId, positionSmoothing);
+        trailCompute.SetFloat(VelocitySmoothingId, velocitySmoothing);
+        trailCompute.Dispatch(smoothKernel, DivideRoundUp(SegmentsTotal, ComputeThreadGroupSize), 1, 1);
+    }
+
     private void TessellateVertices()
     {
+        trailCompute.SetBuffer(tessellateKernel, SegmentBufferId, segmentBuffer);
+        trailCompute.SetBuffer(tessellateKernel, VertexBufferId, vertexBuffer);
+
         trailCompute.SetInt(TotalVertexCountId, VerticesTotal);
         trailCompute.SetInt(MaxSegmentId, segmentsPerTrail);
         trailCompute.SetInt(SidesPerRingId, sidesPerRing);
@@ -358,6 +407,9 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         _trailMaterial.SetFloat(PulseSpeedId, pulseSpeed);
         _trailMaterial.SetFloat(PulseWidthId, pulseWidth);
         _trailMaterial.SetFloat(PulseIntensityId, pulseIntensity);
+        _trailMaterial.SetFloat(PulseSegmentPhaseId, pulsePhasePerSegment * segmentsPerTrail);
+        _trailMaterial.SetFloat(PulseTrailPhaseId, pulsePhasePerTrail);
+        _trailMaterial.SetFloat(PulseDarkBrightnessId, pulseDarkBrightness);
         _trailMaterial.SetFloat(PaletteWaveSpeedId, paletteWaveSpeed);
         _trailMaterial.SetFloat(PaletteSegmentPhaseId, paletteSegmentPhase);
         _trailMaterial.SetFloat(PaletteTrailPhaseId, paletteTrailPhase);
@@ -398,6 +450,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         CoreUtils.Destroy(_trailMaterial);
         Release(ref initialPositionBuffer);
         Release(ref segmentBuffer);
+        Release(ref advectedSegmentBuffer);
         Release(ref vertexBuffer);
         Release(ref indexBuffer);
         Release(ref paletteBuffer);
@@ -426,8 +479,15 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     // Public setters make the main controls easy to connect to UI sliders or Timeline.
     public void SetLength(float value) => visibleLength = Mathf.Clamp01(value);
     public void SetRadius(float value) => tubeRadius = Mathf.Max(0.0001f, value);
-    public void SetMotionFrequency(float value) => motionFrequency = Mathf.Max(0f, value);
-    public void SetMotionAmplitude(float value) => motionAmplitude = Mathf.Max(0f, value);
+    public void SetCurlConvergence(float value) => curlConvergence = Mathf.Max(0f, value);
+    public void SetCurlViscosity(float value) => curlViscosity = Mathf.Max(0f, value);
+    public void SetCurlReturnStrength(float value) => curlReturnStrength = Mathf.Max(0f, value);
+    public void SetPositionSmoothing(float value) => positionSmoothing = Mathf.Clamp01(value);
+    public void SetVelocitySmoothing(float value) => velocitySmoothing = Mathf.Clamp01(value);
+
+    // Preserve existing UnityEvent/Timeline bindings from the previous controls.
+    public void SetMotionFrequency(float value) => SetCurlConvergence(value);
+    public void SetMotionAmplitude(float value) => SetCurlViscosity(value);
     public void SetGradientChangeSpeed(float value) => gradientChangeSpeed = Mathf.Max(0f, value);
 
     public void Rebuild()
