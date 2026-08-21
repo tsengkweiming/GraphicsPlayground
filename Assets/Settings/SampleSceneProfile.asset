@@ -119,6 +119,9 @@ MonoBehaviour:
   cellSize:
     m_OverrideState: 1
     m_Value: {x: 0.5, y: 0.5, z: 0.5}
+  subdivisionStopThreshold:
+    m_OverrideState: 0
+    m_Value: 0.5
   zFactor2:
     m_OverrideState: 1
     m_Value: -0.03
@@ -289,48 +292,48 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6dca5cd9fcabf5340b4671c54e37ecb1, type: 3}
   m_Name: TemporalDiffusion
   m_EditorClassIdentifier: 
-  active: 1
+  active: 0
   enableEffect:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 1
   intensity:
-    m_OverrideState: 0
-    m_Value: 0.9
+    m_OverrideState: 1
+    m_Value: 1
   feedback:
-    m_OverrideState: 0
-    m_Value: 0.92
+    m_OverrideState: 1
+    m_Value: 0.91
   historyDecay:
-    m_OverrideState: 0
-    m_Value: 0.995
+    m_OverrideState: 1
+    m_Value: 1
   diffusionRadius:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 1.25
   diffusionRate:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 0.18
   chromaticSeparation:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 1.4
   chromaticDirection:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: {x: 1, y: 0.35}
   flowStrength:
-    m_OverrideState: 0
-    m_Value: 0.45
+    m_OverrideState: 1
+    m_Value: 2.62
   flowScale:
-    m_OverrideState: 0
-    m_Value: 3
+    m_OverrideState: 1
+    m_Value: 4
   flowSpeed:
-    m_OverrideState: 0
-    m_Value: 0.2
+    m_OverrideState: 1
+    m_Value: 1.26
   motionResponse:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 3
   cameraCutDistance:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 5
   cameraCutAngle:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 50
 --- !u!114 &4548338353279215947
 MonoBehaviour:
