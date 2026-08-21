@@ -1,15 +1,13 @@
 #pragma kernel InitializeSegments
 #pragma kernel AnimateSegments
-#pragma kernel SmoothSegments
+#pragma kernel ReconstructFrames
 #pragma kernel TessellateVertices
 
 #include "../../Shaders/Common/Noise.hlsl"
 
 struct SegmentData
 {
-    float3 initialPosition;
     float3 position;
-    float3 velocity;
     float3 direction;
     float3 normal;
 };
@@ -23,7 +21,6 @@ struct VertexData
 
 StructuredBuffer<float3> _InitialPositionBuffer;
 RWStructuredBuffer<SegmentData> _SegmentBuffer;
-RWStructuredBuffer<SegmentData> _AdvectedSegmentBuffer;
 RWStructuredBuffer<VertexData> _VertexBuffer;
 
 int _MaxSegment;
@@ -32,156 +29,122 @@ float _TubeRadius;
 float _VisibleLength;
 float _CenterlineNoiseScale;
 float _CenterlineStep;
-float _TrailTime;
-float _NoiseSeed;
 int _TrailCount;
-int _TotalSegmentCount;
 int _TotalVertexCount;
-float3 _Position;
-float _DeltaTime;
-float _CurlConvergence;
-float _CurlViscosity;
-float _CurlReturnStrength;
-float3 _CurlAdditionalVector;
-float _PositionSmoothing;
-float _VelocitySmoothing;
+float3 _NoiseOffset;
 
 static const float kEpsilon = 1e-5;
-static const float kCurlEpsilon = 1e-3;
 
-float3 CurlNoise(float3 p)
+float3 SafeNormalize(float3 value, float3 fallback)
 {
-    float3 dx = float3(kCurlEpsilon, 0.0, 0.0);
-    float3 dy = float3(0.0, kCurlEpsilon, 0.0);
-    float3 dz = float3(0.0, 0.0, kCurlEpsilon);
-
-    float3 dpdx0 = snoise3D(p - dx);
-    float3 dpdx1 = snoise3D(p + dx);
-    float3 dpdy0 = snoise3D(p - dy);
-    float3 dpdy1 = snoise3D(p + dy);
-    float3 dpdz0 = snoise3D(p - dz);
-    float3 dpdz1 = snoise3D(p + dz);
-
-    float x = dpdy1.z - dpdy0.z + dpdz1.y - dpdz0.y;
-    float y = dpdz1.x - dpdz0.x + dpdx1.z - dpdx0.z;
-    float z = dpdx1.y - dpdx0.y + dpdy1.x - dpdy0.x;
-
-    return float3(x, y, z) / kCurlEpsilon * 2.0;
+    float lengthSq = dot(value, value);
+    return lengthSq > kEpsilon ? value * rsqrt(lengthSq) : fallback;
 }
 
-float3 BuildFrameNormal(float3 direction, float3 previousNormal)
+// Keijiro's Swarm constructs a smooth divergence-free field from the cross
+// product of two simplex-noise gradients. SimplexNoiseGrad returns
+// gradient.xyz and noise value in w.
+float3 SwirlField(float3 position)
 {
-    float3 projected = previousNormal - direction * dot(previousNormal, direction);
-    float projectedLength = length(projected);
+    float3 samplePosition = position * _CenterlineNoiseScale + _NoiseOffset;
+    float3 gradientA = SimplexNoiseGrad(98.4898 + samplePosition).xyz;
+    float3 gradientB = SimplexNoiseGrad(1.2278 - samplePosition).xyz;
+    return cross(gradientA, gradientB);
+}
 
-    if (projectedLength < kEpsilon)
+void GenerateTrail(uint trailIndex)
+{
+    if (trailIndex >= (uint)_TrailCount)
+        return;
+
+    uint ringCount = (uint)(_MaxSegment + 1);
+    uint baseIndex = trailIndex * ringCount;
+    float3 position = _InitialPositionBuffer[trailIndex];
+
+    SegmentData segment;
+    segment.position = position;
+    segment.direction = float3(0, 0, 1);
+    segment.normal = float3(0, 1, 0);
+    _SegmentBuffer[baseIndex] = segment;
+
+    for (uint segmentIndex = 1; segmentIndex < ringCount; segmentIndex++)
     {
-        float3 fallback = abs(direction.y) < 0.95 ? float3(0, 1, 0) : float3(1, 0, 0);
-        projected = cross(direction, fallback);
+        position += SwirlField(position) * _CenterlineStep;
+        segment.position = position;
+        _SegmentBuffer[baseIndex + segmentIndex] = segment;
+    }
+}
+
+float3 InitialNormal(float3 tangent, float3 position)
+{
+    float3 reference = SafeNormalize(position, float3(0, 1, 0));
+    float3 binormal = cross(tangent, reference);
+
+    if (dot(binormal, binormal) <= kEpsilon)
+    {
+        reference = abs(tangent.y) < 0.95 ? float3(0, 1, 0) : float3(1, 0, 0);
+        binormal = cross(tangent, reference);
     }
 
-    return normalize(projected);
+    binormal = SafeNormalize(binormal, float3(1, 0, 0));
+    return SafeNormalize(cross(binormal, tangent), float3(0, 1, 0));
 }
 
 [numthreads(64, 1, 1)]
 void InitializeSegments(uint trailIndex : SV_DispatchThreadID)
 {
+    GenerateTrail(trailIndex);
+}
+
+[numthreads(64, 1, 1)]
+void AnimateSegments(uint trailIndex : SV_DispatchThreadID)
+{
+    GenerateTrail(trailIndex);
+}
+
+[numthreads(64, 1, 1)]
+void ReconstructFrames(uint trailIndex : SV_DispatchThreadID)
+{
     if (trailIndex >= (uint)_TrailCount)
         return;
 
-    int ringCount = _MaxSegment + 1;
-    float3 previousPosition = _InitialPositionBuffer[trailIndex];
-    float3 previousNormal = float3(0, 1, 0);
-
-    for (int segmentIndex = 0; segmentIndex < ringCount; segmentIndex++)
-    {
-        int bufferIndex = (int)trailIndex * ringCount + segmentIndex;
-        float3 samplePosition = (previousPosition + float3(trailIndex * 0.02, _NoiseSeed * 0.013, segmentIndex * 0.001)) * _CenterlineNoiseScale;
-        float3 position = previousPosition + CurlNoise(samplePosition) * _CenterlineStep;
-        float3 direction = normalize(previousPosition - position);
-
-        if (length(direction) < kEpsilon)
-            direction = float3(0, -1, 0);
-
-        float3 normal = BuildFrameNormal(direction, previousNormal);
-
-        SegmentData segment;
-        segment.initialPosition = position;
-        segment.position = position;
-        segment.velocity = 0.0;
-        segment.direction = direction;
-        segment.normal = normal;
-        _SegmentBuffer[bufferIndex] = segment;
-
-        previousPosition = position;
-        previousNormal = normal;
-    }
-}
-
-[numthreads(64, 1, 1)]
-void AnimateSegments(uint segmentIndex : SV_DispatchThreadID)
-{
-    if (segmentIndex >= (uint)_TotalSegmentCount)
-        return;
-
-    SegmentData segment = _SegmentBuffer[segmentIndex];
-    float dt = min(max(_DeltaTime, 0.0), 0.0333);
-
-    // This follows the reference particle solver: curl is a force field,
-    // velocity persists between frames, and position is advected by velocity.
-    float3 fieldPosition = segment.position * dt * _CurlConvergence;
-    float3 force = CurlNoise(fieldPosition) - segment.velocity;
-    force += (segment.initialPosition - segment.position) * _CurlReturnStrength;
-    force += _CurlAdditionalVector;
-
-    float warmup = saturate(_TrailTime * 0.5);
-    segment.velocity += force * dt * _CurlViscosity * warmup;
-    segment.position += segment.velocity * dt;
-    _AdvectedSegmentBuffer[segmentIndex] = segment;
-}
-
-[numthreads(64, 1, 1)]
-void SmoothSegments(uint segmentIndex : SV_DispatchThreadID)
-{
-    if (segmentIndex >= (uint)_TotalSegmentCount)
-        return;
-
     uint ringCount = (uint)(_MaxSegment + 1);
-    uint localIndex = segmentIndex % ringCount;
-    uint lastIndex = ringCount - 1;
+    uint baseIndex = trailIndex * ringCount;
 
-    SegmentData segment = _AdvectedSegmentBuffer[segmentIndex];
-    SegmentData previousSegment = _AdvectedSegmentBuffer[
-        localIndex > 0 ? segmentIndex - 1 : segmentIndex];
-    SegmentData nextSegment = _AdvectedSegmentBuffer[
-        localIndex < lastIndex ? segmentIndex + 1 : segmentIndex];
+    SegmentData first = _SegmentBuffer[baseIndex];
+    SegmentData second = _SegmentBuffer[baseIndex + 1];
+    float3 tangent = SafeNormalize(second.position - first.position, float3(0, 0, 1));
+    float3 normal = InitialNormal(tangent, first.position);
+    float3 binormal = SafeNormalize(cross(tangent, normal), float3(1, 0, 0));
 
-    if (localIndex > 0 && localIndex < lastIndex)
+    first.direction = tangent;
+    first.normal = normal;
+    _SegmentBuffer[baseIndex] = first;
+
+    for (uint segmentIndex = 1; segmentIndex < ringCount - 1; segmentIndex++)
     {
-        float3 neighborPosition =
-            (previousSegment.position + nextSegment.position) * 0.5;
-        float3 neighborVelocity =
-            (previousSegment.velocity + nextSegment.velocity) * 0.5;
+        uint index = baseIndex + segmentIndex;
+        float3 previousPosition = _SegmentBuffer[index - 1].position;
+        float3 nextPosition = _SegmentBuffer[index + 1].position;
 
-        segment.position = lerp(
-            segment.position,
-            neighborPosition,
-            saturate(_PositionSmoothing));
-        segment.velocity = lerp(
-            segment.velocity,
-            neighborVelocity,
-            saturate(_VelocitySmoothing));
+        tangent = SafeNormalize(nextPosition - previousPosition, tangent);
+        normal = SafeNormalize(cross(binormal, tangent), normal);
+        binormal = SafeNormalize(cross(tangent, normal), binormal);
+
+        SegmentData segment = _SegmentBuffer[index];
+        segment.direction = tangent;
+        segment.normal = normal;
+        _SegmentBuffer[index] = segment;
     }
 
-    // The original frame cannot be reused after independent advection. Rebuild
-    // the tangent and project the old normal onto its new tangent plane.
-    float3 direction = previousSegment.position - nextSegment.position;
-    float directionLengthSq = dot(direction, direction);
-    if (directionLengthSq > kEpsilon)
-        segment.direction = direction * rsqrt(directionLengthSq);
-
-    segment.normal = BuildFrameNormal(segment.direction, segment.normal);
-    _SegmentBuffer[segmentIndex] = segment;
+    uint lastIndex = baseIndex + ringCount - 1;
+    SegmentData previous = _SegmentBuffer[lastIndex - 1];
+    SegmentData last = _SegmentBuffer[lastIndex];
+    tangent = SafeNormalize(last.position - previous.position, tangent);
+    normal = SafeNormalize(cross(binormal, tangent), normal);
+    last.direction = tangent;
+    last.normal = normal;
+    _SegmentBuffer[lastIndex] = last;
 }
 
 [numthreads(64, 1, 1)]

@@ -15,9 +15,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     [StructLayout(LayoutKind.Sequential)]
     private struct SegmentData
     {
-        public Vector3 initialPosition;
         public Vector3 position;
-        public Vector3 velocity;
         public Vector3 direction;
         public Vector3 normal;
     }
@@ -47,16 +45,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     [Min(0f)] [SerializeField] private float initialSpread = 30f;
     [Min(0.0001f)] [SerializeField] private float centerlineNoiseScale = 0.01f;
     [Min(0f)] [SerializeField] private float centerlineStep = 2f;
-
-    [Header("Curl Noise Flow")]
-    [Min(0f)] [SerializeField] private float curlConvergence = 1f;
-    [Min(0f)] [SerializeField] private float curlViscosity = 1f;
-    [Min(0f)] [SerializeField] private float curlReturnStrength = 0.05f;
-    [SerializeField] private Vector3 curlAdditionalVector;
-
-    [Header("Trail Smoothing")]
-    [Range(0f, 1f)] [SerializeField] private float positionSmoothing = 0.65f;
-    [Range(0f, 1f)] [SerializeField] private float velocitySmoothing = 0.5f;
+    [SerializeField] private Vector3 noiseMotion = new Vector3(0f, 0.1f, 0f);
 
     [Header("Color")]
     [SerializeField] private Gradient[] gradients = new Gradient[0];
@@ -80,7 +69,6 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
 
     private static readonly int InitialPositionBufferId = Shader.PropertyToID("_InitialPositionBuffer");
     private static readonly int SegmentBufferId = Shader.PropertyToID("_SegmentBuffer");
-    private static readonly int AdvectedSegmentBufferId = Shader.PropertyToID("_AdvectedSegmentBuffer");
     private static readonly int VertexBufferId = Shader.PropertyToID("_VertexBuffer");
     private static readonly int IndexBufferId = Shader.PropertyToID("_IndexBuffer");
     private static readonly int PaletteBufferId = Shader.PropertyToID("_Palette");
@@ -90,15 +78,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     private static readonly int VisibleLengthId = Shader.PropertyToID("_VisibleLength");
     private static readonly int CenterlineNoiseScaleId = Shader.PropertyToID("_CenterlineNoiseScale");
     private static readonly int CenterlineStepId = Shader.PropertyToID("_CenterlineStep");
-    private static readonly int CurlConvergenceId = Shader.PropertyToID("_CurlConvergence");
-    private static readonly int CurlViscosityId = Shader.PropertyToID("_CurlViscosity");
-    private static readonly int CurlReturnStrengthId = Shader.PropertyToID("_CurlReturnStrength");
-    private static readonly int CurlAdditionalVectorId = Shader.PropertyToID("_CurlAdditionalVector");
-    private static readonly int PositionSmoothingId = Shader.PropertyToID("_PositionSmoothing");
-    private static readonly int VelocitySmoothingId = Shader.PropertyToID("_VelocitySmoothing");
-    private static readonly int CurrentTimeId = Shader.PropertyToID("_TrailTime");
-    private static readonly int DeltaTimeId = Shader.PropertyToID("_DeltaTime");
-    private static readonly int NoiseSeedId = Shader.PropertyToID("_NoiseSeed");
+    private static readonly int NoiseOffsetId = Shader.PropertyToID("_NoiseOffset");
     private static readonly int VerticesPerTrailId = Shader.PropertyToID("_VerticesPerTrail");
     private static readonly int PaletteSizeId = Shader.PropertyToID("_PaletteSize");
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -115,7 +95,6 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     private static readonly int PaletteSegmentPhaseId = Shader.PropertyToID("_PaletteSegmentPhase");
     private static readonly int PaletteTrailPhaseId = Shader.PropertyToID("_PaletteTrailPhase");
     private static readonly int TrailCountId = Shader.PropertyToID("_TrailCount");
-    private static readonly int TotalSegmentCountId = Shader.PropertyToID("_TotalSegmentCount");
     private static readonly int TotalVertexCountId = Shader.PropertyToID("_TotalVertexCount");
     private static readonly int LocalToWorldId = Shader.PropertyToID("_LocalToWorld");
 
@@ -123,7 +102,6 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
 
     private ComputeBuffer initialPositionBuffer;
     private ComputeBuffer segmentBuffer;
-    private ComputeBuffer advectedSegmentBuffer;
     private ComputeBuffer vertexBuffer;
     private ComputeBuffer indexBuffer;
     private ComputeBuffer paletteBuffer;
@@ -133,11 +111,12 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     private Vector4[] palette;
     private int initializeKernel;
     private int animateKernel;
-    private int smoothKernel;
+    private int reconstructKernel;
     private int tessellateKernel;
     private bool initialized;
     private bool buffersDirty = true;
     private bool reportedMissingReference;
+    private Vector3 noiseOffset;
 
     private int RingCount => segmentsPerTrail + 1;
     private int VerticesPerTrail => RingCount * sidesPerRing;
@@ -161,8 +140,9 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         UpdatePalette();
         BindComputeBuffers();
         AnimateSegments();
-        SmoothSegments();
+        ReconstructFrames();
         TessellateVertices();
+        noiseOffset += noiseMotion * Mathf.Min(Time.deltaTime, 1f / 30f);
     }
 
     private void OnRenderObject()
@@ -204,6 +184,8 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         sidesPerRing = Mathf.Clamp(sidesPerRing, 3, 64);
         paletteResolution = Mathf.Max(2, paletteResolution);
         visibleLength = Mathf.Clamp01(visibleLength);
+        centerlineNoiseScale = Mathf.Max(0.0001f, centerlineNoiseScale);
+        centerlineStep = Mathf.Max(0f, centerlineStep);
 
         if (Application.isPlaying)
             buffersDirty = true;
@@ -232,6 +214,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         AllocateBuffers();
         BindComputeBuffers();
         InitializeSegments();
+        ReconstructFrames();
 
         buffersDirty = false;
         initialized = true;
@@ -240,9 +223,14 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     private void FindKernels()
     {
         _trailMaterial = new Material(trailShader);
+        RefreshKernelIndices();
+    }
+
+    private void RefreshKernelIndices()
+    {
         initializeKernel = trailCompute.FindKernel("InitializeSegments");
         animateKernel = trailCompute.FindKernel("AnimateSegments");
-        smoothKernel = trailCompute.FindKernel("SmoothSegments");
+        reconstructKernel = trailCompute.FindKernel("ReconstructFrames");
         tessellateKernel = trailCompute.FindKernel("TessellateVertices");
     }
 
@@ -253,6 +241,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         palette = new Vector4[paletteResolution];
 
         var random = new System.Random(seed);
+        noiseOffset = Vector3.one * (seed * 0.01f);
         for (int i = 0; i < initialPositions.Length; i++)
         {
             Vector3 point;
@@ -296,7 +285,6 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     {
         initialPositionBuffer = new ComputeBuffer(initialPositions.Length, Marshal.SizeOf<Vector3>(), ComputeBufferType.Structured);
         segmentBuffer = new ComputeBuffer(SegmentsTotal, Marshal.SizeOf<SegmentData>(), ComputeBufferType.Structured);
-        advectedSegmentBuffer = new ComputeBuffer(SegmentsTotal, Marshal.SizeOf<SegmentData>(), ComputeBufferType.Structured);
         vertexBuffer = new ComputeBuffer(VerticesTotal, Marshal.SizeOf<VertexData>(), ComputeBufferType.Structured);
         indexBuffer = new ComputeBuffer(indices.Length, sizeof(int), ComputeBufferType.Structured);
         paletteBuffer = new ComputeBuffer(paletteResolution, Marshal.SizeOf<Vector4>(), ComputeBufferType.Structured);
@@ -307,14 +295,17 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
 
     private void BindComputeBuffers()
     {
+        // Compute-shader hot reload can change kernel indices while this
+        // component remains initialized in Play Mode.
+        RefreshKernelIndices();
+
         trailCompute.SetBuffer(initializeKernel, InitialPositionBufferId, initialPositionBuffer);
         trailCompute.SetBuffer(initializeKernel, SegmentBufferId, segmentBuffer);
 
+        trailCompute.SetBuffer(animateKernel, InitialPositionBufferId, initialPositionBuffer);
         trailCompute.SetBuffer(animateKernel, SegmentBufferId, segmentBuffer);
-        trailCompute.SetBuffer(animateKernel, AdvectedSegmentBufferId, advectedSegmentBuffer);
 
-        trailCompute.SetBuffer(smoothKernel, AdvectedSegmentBufferId, advectedSegmentBuffer);
-        trailCompute.SetBuffer(smoothKernel, SegmentBufferId, segmentBuffer);
+        trailCompute.SetBuffer(reconstructKernel, SegmentBufferId, segmentBuffer);
 
         trailCompute.SetBuffer(tessellateKernel, SegmentBufferId, segmentBuffer);
         trailCompute.SetBuffer(tessellateKernel, VertexBufferId, vertexBuffer);
@@ -322,53 +313,38 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
 
     private void InitializeSegments()
     {
-        trailCompute.SetBuffer(initializeKernel, InitialPositionBufferId, initialPositionBuffer);
-        trailCompute.SetBuffer(initializeKernel, SegmentBufferId, segmentBuffer);
-
         trailCompute.SetInt(TrailCountId, trailCount);
         trailCompute.SetInt(MaxSegmentId, segmentsPerTrail);
         trailCompute.SetInt(SidesPerRingId, sidesPerRing);
         trailCompute.SetFloat(CenterlineNoiseScaleId, centerlineNoiseScale);
         trailCompute.SetFloat(CenterlineStepId, centerlineStep);
-        trailCompute.SetFloat(NoiseSeedId, seed);
+        trailCompute.SetVector(NoiseOffsetId, noiseOffset);
         trailCompute.Dispatch(initializeKernel, DivideRoundUp(trailCount, ComputeThreadGroupSize), 1, 1);
     }
 
     private void AnimateSegments()
     {
-        // Compute buffer bindings are per-kernel and can be cleared when Unity
-        // recompiles the compute shader in the Editor.
+        trailCompute.SetBuffer(animateKernel, InitialPositionBufferId, initialPositionBuffer);
         trailCompute.SetBuffer(animateKernel, SegmentBufferId, segmentBuffer);
-        trailCompute.SetBuffer(animateKernel, AdvectedSegmentBufferId, advectedSegmentBuffer);
 
-        trailCompute.SetInt(TotalSegmentCountId, SegmentsTotal);
-        trailCompute.SetFloat(CurlConvergenceId, curlConvergence);
-        trailCompute.SetFloat(CurlViscosityId, curlViscosity);
-        trailCompute.SetFloat(CurlReturnStrengthId, curlReturnStrength);
-        trailCompute.SetVector(CurlAdditionalVectorId, curlAdditionalVector);
-        trailCompute.SetFloat(DeltaTimeId, Time.deltaTime);
-        trailCompute.SetFloat(CurrentTimeId, Time.time);
-        trailCompute.SetFloat(NoiseSeedId, seed);
-        trailCompute.Dispatch(animateKernel, DivideRoundUp(SegmentsTotal, ComputeThreadGroupSize), 1, 1);
+        trailCompute.SetInt(TrailCountId, trailCount);
+        trailCompute.SetInt(MaxSegmentId, segmentsPerTrail);
+        trailCompute.SetFloat(CenterlineNoiseScaleId, centerlineNoiseScale);
+        trailCompute.SetFloat(CenterlineStepId, centerlineStep);
+        trailCompute.SetVector(NoiseOffsetId, noiseOffset);
+        trailCompute.Dispatch(animateKernel, DivideRoundUp(trailCount, ComputeThreadGroupSize), 1, 1);
     }
 
-    private void SmoothSegments()
+    private void ReconstructFrames()
     {
-        trailCompute.SetBuffer(smoothKernel, AdvectedSegmentBufferId, advectedSegmentBuffer);
-        trailCompute.SetBuffer(smoothKernel, SegmentBufferId, segmentBuffer);
-
-        trailCompute.SetInt(TotalSegmentCountId, SegmentsTotal);
+        trailCompute.SetBuffer(reconstructKernel, SegmentBufferId, segmentBuffer);
+        trailCompute.SetInt(TrailCountId, trailCount);
         trailCompute.SetInt(MaxSegmentId, segmentsPerTrail);
-        trailCompute.SetFloat(PositionSmoothingId, positionSmoothing);
-        trailCompute.SetFloat(VelocitySmoothingId, velocitySmoothing);
-        trailCompute.Dispatch(smoothKernel, DivideRoundUp(SegmentsTotal, ComputeThreadGroupSize), 1, 1);
+        trailCompute.Dispatch(reconstructKernel, DivideRoundUp(trailCount, ComputeThreadGroupSize), 1, 1);
     }
 
     private void TessellateVertices()
     {
-        trailCompute.SetBuffer(tessellateKernel, SegmentBufferId, segmentBuffer);
-        trailCompute.SetBuffer(tessellateKernel, VertexBufferId, vertexBuffer);
-
         trailCompute.SetInt(TotalVertexCountId, VerticesTotal);
         trailCompute.SetInt(MaxSegmentId, segmentsPerTrail);
         trailCompute.SetInt(SidesPerRingId, sidesPerRing);
@@ -450,7 +426,6 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         CoreUtils.Destroy(_trailMaterial);
         Release(ref initialPositionBuffer);
         Release(ref segmentBuffer);
-        Release(ref advectedSegmentBuffer);
         Release(ref vertexBuffer);
         Release(ref indexBuffer);
         Release(ref paletteBuffer);
@@ -479,15 +454,10 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     // Public setters make the main controls easy to connect to UI sliders or Timeline.
     public void SetLength(float value) => visibleLength = Mathf.Clamp01(value);
     public void SetRadius(float value) => tubeRadius = Mathf.Max(0.0001f, value);
-    public void SetCurlConvergence(float value) => curlConvergence = Mathf.Max(0f, value);
-    public void SetCurlViscosity(float value) => curlViscosity = Mathf.Max(0f, value);
-    public void SetCurlReturnStrength(float value) => curlReturnStrength = Mathf.Max(0f, value);
-    public void SetPositionSmoothing(float value) => positionSmoothing = Mathf.Clamp01(value);
-    public void SetVelocitySmoothing(float value) => velocitySmoothing = Mathf.Clamp01(value);
-
-    // Preserve existing UnityEvent/Timeline bindings from the previous controls.
-    public void SetMotionFrequency(float value) => SetCurlConvergence(value);
-    public void SetMotionAmplitude(float value) => SetCurlViscosity(value);
+    public void SetNoiseFrequency(float value) => centerlineNoiseScale = Mathf.Max(0.0001f, value);
+    public void SetStepWidth(float value) => centerlineStep = Mathf.Max(0f, value);
+    public void SetMotionFrequency(float value) => SetNoiseFrequency(value);
+    public void SetMotionAmplitude(float value) => SetStepWidth(value);
     public void SetGradientChangeSpeed(float value) => gradientChangeSpeed = Mathf.Max(0f, value);
 
     public void Rebuild()
