@@ -23,7 +23,9 @@ Shader "Hidden/ASCII Art"
         _PatternBackgroundColor ("Pattern Background Color", Color) = (1, 1, 1, 1)
         _Resolution ("Resolution (Grid Columns)", Range(10, 350)) = 60
         _PosterizeLevels ("Posterize Levels", Range(-2, 50)) = 5
-        _QuadTreeThreshold ("Quad Tree Variance Threshold", Range(0.0001, 0.01)) = 0.0025
+        _QuadTreeThreshold ("Quad Tree Brightness Stop", Range(0, 1)) = 0.5
+        _QuadTreeMinDivisions ("Quad Tree Minimum Divisions", Range(1, 32)) = 4
+        _QuadTreeMaxIterations ("Quad Tree Maximum Depth", Range(1, 8)) = 6
 
         // --- Tonal range controls (stretch image luminance into full pattern range) ---
         _InputBlack ("Input Black Point", Range(0, 1)) = 0
@@ -38,7 +40,6 @@ Shader "Hidden/ASCII Art"
         _Saturation ("Saturation", Range(0, 2)) = 1
         _Value ("Value (Brightness)", Range(0, 2)) = 1
         
-        _Threshold ("Variance Threshold", Range(0.0001, 0.01)) = 0.0025
         _LineColor ("Grid Line Color", Color) = (0.0, 0.0, 0.0, 1.0)
         _LineWidth ("Grid Line Width (Pixels)", Range(0.1, 4.0)) = 1.0
         _LineStrength ("Grid Line Strength", Range(0.0, 1.0)) = 1.0
@@ -69,13 +70,6 @@ Shader "Hidden/ASCII Art"
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_instancing
-
-            // Adaptive reference-image sampling. A quad is subdivided when the
-            // estimated RGB variance inside it is above _QuadTreeThreshold.
-            #define ASCII_QUADTREE_MIN_DIVISIONS 4.0
-            #define ASCII_QUADTREE_MAX_ITERATIONS 6
-            #define ASCII_QUADTREE_SAMPLES_PER_ITERATION 30
-            #define ASCII_QUADTREE_F_SAMPLES_PER_ITERATION 30.0
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Assets/Shaders/Common/QuadTree.hlsl"
@@ -141,7 +135,8 @@ Shader "Hidden/ASCII Art"
                 float _PatternCount;
                 float _TextureCount;
                 float _QuadTreeThreshold;
-                float _Threshold;
+                float _QuadTreeMinDivisions;
+                float _QuadTreeMaxIterations;
                 float4 _LineColor;
                 float _LineWidth;
                 float _LineStrength;
@@ -297,40 +292,28 @@ Shader "Hidden/ASCII Art"
                 float2 cellCenterUv = (cellId + 0.5) / float2(cols, rows);
 
                 float2 analysisUv = cellCenterUv;
-                float divisions = MIN_DIVISIONS;
-                float2 quadCenter = (floor(analysisUv * divisions) + 0.5) / divisions;
-                float quadSize = 1.0 / divisions;
-                float4 quadInfo = 0.0;
-
-                [loop]
-                for (int iteration = 0; iteration < MAX_ITERATIONS; ++iteration)
-                {
-                    quadInfo = QuadColorVariation(_MainTex, sampler_MainTex, quadCenter, quadSize);
-
-                    if (quadInfo.w < _Threshold)
-                        break;
-
-                    divisions *= 2.0;
-                    quadCenter = (floor(analysisUv * divisions) + 0.5) / divisions;
-                    quadSize *= 0.5;
-                }
+                BrightnessQuadResult quad = FindBrightnessQuadTree(
+                    _MainTex,
+                    sampler_MainTex,
+                    analysisUv,
+                    _QuadTreeMinDivisions,
+                    (int)round(_QuadTreeMaxIterations),
+                    _QuadTreeThreshold);
+                float divisions = quad.divisions;
                 // Draw the boundary of the selected adaptive quad. _ScaledScreenParams
                 // is the URP equivalent of Shadertoy's iResolution for this pass.
                 float2 normalizedQuadUV = frac(uv * divisions);
                 float2 pixelWidth = _LineWidth / max(_ScaledScreenParams.xy, 1.0);
-                float2 distanceToCenter = abs(normalizedQuadUV - 0.5);
+                float2 distanceToEdge = min(normalizedQuadUV, 1.0 - normalizedQuadUV);
                 float lineMask =
-                    step(0.5 - distanceToCenter.x, pixelWidth.x * divisions) +
-                    step(0.5 - distanceToCenter.y, pixelWidth.y * divisions);
+                    max(
+                        step(distanceToEdge.x, pixelWidth.x * divisions),
+                        step(distanceToEdge.y, pixelWidth.y * divisions));
 
                 float lineBlend = saturate(lineMask * _LineStrength);
-                
-                // float quadSize;
-                // FindQuadTreeSample(uv, cellCenterUv, quadSize);
-                half3 refColor = (half3)SampleReference(analysisUv);
 
                 // Calculate brightness (0-1)
-                float brightness = dot(refColor, float3(0.299, 0.587, 0.114));
+                float brightness = quad.brightness;
 
                 // Remap tonal range so more of the pattern set is used
                 brightness = AdjustLuminance(brightness);
@@ -352,11 +335,9 @@ Shader "Hidden/ASCII Art"
 
                 half3 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(uv)).rgb;
                 float index = mono_phase(uv, _Time.y);
-                return float4(lerp(color, result, index),1);
-                result = uv.x > 0.5 ? result : color;
-                result = lerp(result, _LineColor.rgb, lineBlend);
-                return half4(result, 1.0);
-                // return half4(uv.x > 0.25 ? result : color, _BackgroundColor.a);
+                half3 output = lerp(color, result, index);
+                output = lerp(output, (half3)_LineColor.rgb, lineBlend);
+                return half4(output, 1.0);
             }
             ENDHLSL
         }

@@ -24,7 +24,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: cf42f7cf27c4307498cb9515d3087a95, type: 3}
+        m_Texture: {fileID: 2800000, guid: 15cf53faf844b074d9772b283b3fbf82, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MaintTex:
@@ -44,11 +44,31 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Pattern3:
-        m_Texture: {fileID: 2800000, guid: 8ed07d570fbf106448735568169f571e, type: 3}
+        m_Texture: {fileID: 2800000, guid: 751b6ecbf19aef84ea1a089f21bfd561, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Pattern4:
-        m_Texture: {fileID: 2800000, guid: 0c4886110e1e8734abb5c6b6002508ca, type: 3}
+        m_Texture: {fileID: 2800000, guid: 4d93c53a86f59034a9494f09cb83c7e9, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern5:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern6:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern7:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern8:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern9:
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _ReferenceImage:
@@ -90,15 +110,28 @@ Material:
     - _InputBlack: 0
     - _InputWhite: 1
     - _InvertLuma: 0
+    - _LineStrength: 1
+    - _LineWidth: 1
+    - _PatternCount: 5
+    - _PhaseSpeed: 0.1
     - _PosterizeLevels: 16.7
+    - _QuadTreeMaxIterations: 6
+    - _QuadTreeMinDivisions: 4
+    - _QuadTreeThreshold: 0.5
     - _Resolution: 150
-    - _Saturation: 0.5
-    - _Size: 0
+    - _Saturation: 1
+    - _Size: 1
+    - _T: 0
+    - _TextureCount: 4
+    - _Threshold: 0.0025
     - _Value: 1
-    - _Z: 0
-    - _Z2: 0
+    - _Z: 0.47
+    - _Z2: 0.45
     m_Colors:
     - _BackgroundColor: {r: 0, g: 0, b: 0, a: 1}
     - _BorderColor: {r: 1, g: 0, b: 0, a: 1}
+    - _LineColor: {r: 0, g: 0, b: 0, a: 1}
+    - _PatternBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+    - _PatternColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
