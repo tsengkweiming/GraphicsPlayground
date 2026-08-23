@@ -6,8 +6,6 @@ namespace Common
 [RequireComponent(typeof(Renderer))]
 public class MicrotorusController : EffectController
 {
-    [SerializeField] private Renderer _targetRenderer;
-    [SerializeField] private int _materialIndex;
     [SerializeField] private float swipeSpeed = 1f;
     [SerializeField] private float recoverSpeed = 2f;
     [SerializeField] private float engageSpeed = 2f;
@@ -16,7 +14,6 @@ public class MicrotorusController : EffectController
     private static readonly int SwipeOffsetId = Shader.PropertyToID("_SwipeOffset");
     private static readonly int SwipeWarpId = Shader.PropertyToID("_SwipeWarp");
 
-    private MaterialPropertyBlock _propertyBlock;
     private Vector2 _swipeOffset;
     private Vector2 _swipeWarp;
     private int _activeAxis;
@@ -25,15 +22,7 @@ public class MicrotorusController : EffectController
 
     protected override void OnEnable()
     {
-        if (_targetRenderer == null)
-        {
-            _targetRenderer = GetComponent<Renderer>();
-        }
-
-        if (_propertyBlock == null)
-        {
-            _propertyBlock = new MaterialPropertyBlock();
-        }
+        base.OnEnable();
 
         Material material = GetTargetMaterial(out _);
         _activeAxis = GetRequestedAxis(material);
@@ -141,19 +130,6 @@ public class MicrotorusController : EffectController
         }
 
         return material.GetFloat(DirSwitchId) >= 0.5f ? 1 : 0;
-    }
-
-    protected override Material GetTargetMaterial(out int index)
-    {
-        Material[] materials = _targetRenderer.sharedMaterials;
-        if (materials == null || materials.Length == 0)
-        {
-            index = 0;
-            return null;
-        }
-
-        index = Mathf.Clamp(_materialIndex, 0, materials.Length - 1);
-        return materials[index];
     }
 
     private static double GetEditorTime()

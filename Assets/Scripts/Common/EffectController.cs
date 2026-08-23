@@ -4,8 +4,10 @@ namespace Common
 {
     public abstract class EffectController : MonoBehaviour
     {
-        [SerializeField] private int _materialIndex;
-        protected Renderer _targetRenderer;
+        // Shared by all derived controllers. Keep one serialized field in the
+        // inheritance chain so Unity does not see duplicate _materialIndex data.
+        [SerializeField] protected int _materialIndex;
+        [SerializeField] protected Renderer _targetRenderer;
         protected MaterialPropertyBlock _propertyBlock;
 
         protected virtual void OnEnable()
