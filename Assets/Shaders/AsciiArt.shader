@@ -276,15 +276,30 @@ Shader "Hidden/ASCII Art"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float2 uv = input.uv;
-                float aspect = _ScaledScreenParams.x /
-                               max(_ScaledScreenParams.y, 1.0);
+
+                // Derivatives describe how much UV space one screen pixel
+                // covers on this actual mesh. Unlike _ScaledScreenParams,
+                // this remains correct when the quad is square, 16:9, scaled,
+                // or rendered into a different-size target.
+                float uvPerPixelX = max(length(ddx(uv)), 1e-6);
+                float uvPerPixelY = max(length(ddy(uv)), 1e-6);
+                float aspect = uvPerPixelY / uvPerPixelX;
                 
                 // Keep adaptive quadtree cells close to square in screen
-                // space. UV space is wider than it is tall on a 16:9 target,
-                // so the tree needs fewer rows than columns.
-                float2 minQuadDivisions = float2(
-                    _QuadTreeMinDivisions,
-                    max(round(_QuadTreeMinDivisions / aspect), 1.0));
+                // space. Use the actual quad aspect rather than the camera
+                // target aspect, because this shader can render on a square
+                // or 16:9 mesh independently of the render target.
+                float shortAxisDivisions = max(round(_QuadTreeMinDivisions), 1.0);
+                float2 landscapeDivisions = float2(
+                    max(round(shortAxisDivisions * aspect), 1.0),
+                    shortAxisDivisions);
+                float2 portraitDivisions = float2(
+                    shortAxisDivisions,
+                    max(round(shortAxisDivisions / max(aspect, 0.0001)), 1.0));
+                float2 minQuadDivisions = lerp(
+                    portraitDivisions,
+                    landscapeDivisions,
+                    step(1.0, aspect));
 
                 // _Resolution is the maximum horizontal detail requested by
                 // the controller. Since the tree doubles at every level, the
@@ -309,14 +324,15 @@ Shader "Hidden/ASCII Art"
                     maxTreeIterations,
                     _QuadTreeThreshold);
                 // Draw the boundary of the selected adaptive quad. _ScaledScreenParams
-                // is the URP equivalent of Shadertoy's iResolution for this pass.
+                // is intentionally not used here: the line width must follow
+                // the rendered quad, not the camera render-target resolution.
                 float2 normalizedQuadUV = frac(uv * quad.divisions);
-                float2 pixelWidth = _LineWidth / max(_ScaledScreenParams.xy, 1.0);
+                float2 lineWidthUV = _LineWidth * float2(uvPerPixelX, uvPerPixelY);
                 float2 distanceToEdge = min(normalizedQuadUV, 1.0 - normalizedQuadUV);
                 float lineMask =
                     max(
-                        step(distanceToEdge.x, pixelWidth.x * quad.divisions.x),
-                        step(distanceToEdge.y, pixelWidth.y * quad.divisions.y));
+                        step(distanceToEdge.x, lineWidthUV.x * quad.divisions.x),
+                        step(distanceToEdge.y, lineWidthUV.y * quad.divisions.y));
 
                 float lineBlend = saturate(lineMask * _LineStrength);
 
