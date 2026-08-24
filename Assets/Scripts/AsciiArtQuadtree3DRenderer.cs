@@ -21,6 +21,10 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         public Color lineColor = Color.black;
         public float lineWidth = 1.0f;
         public float lineStrength = 1.0f;
+        public float phaseSpeed = 0.1f;
+        public float posterizeLevel = 5f;
+        public Vector3 hsvAdjust = Vector3.one;
+        [Range(0f, 1f)] public float colorTexUvIndex = 0f;
 
         [Header("Adaptive Quadtree")]
         [Min(1)] public float minimumShortAxisDivisions = 4;
@@ -58,6 +62,10 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     private static readonly int LineColorId = Shader.PropertyToID("_LineColor");
     private static readonly int LineWidthId = Shader.PropertyToID("_LineWidth");
     private static readonly int LineStrengthId = Shader.PropertyToID("_LineStrength");
+    private static readonly int PhaseSpeedId = Shader.PropertyToID("_PhaseSpeed");
+    private static readonly int ColorTexUvIndexId = Shader.PropertyToID("_ColorTexUvIndex");
+    private static readonly int PosterizeLevelId = Shader.PropertyToID("_PosterizeLevel");
+    private static readonly int HsvAdjustId = Shader.PropertyToID("_HsvAdjust");
 
     [SerializeField] private Mesh mesh;
     [SerializeField] private Camera targetCamera;
@@ -208,6 +216,10 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         _properties.SetFloat(LineWidthId, param.lineWidth);
         _properties.SetFloat(LineStrengthId, param.lineStrength);
         _properties.SetColor(LineColorId, param.lineColor);
+        _properties.SetFloat(PhaseSpeedId, param.phaseSpeed);
+        _properties.SetFloat(ColorTexUvIndexId, param.colorTexUvIndex);
+        _properties.SetFloat(PosterizeLevelId, param.posterizeLevel);
+        _properties.SetVector(HsvAdjustId, param.hsvAdjust);
 
         if (param.textures != null)
         {

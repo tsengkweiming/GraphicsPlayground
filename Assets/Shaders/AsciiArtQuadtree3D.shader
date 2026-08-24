@@ -29,16 +29,18 @@ Shader "Hidden/ASCII Art Quadtree 3D"
         _Contrast ("Contrast", Range(0, 4)) = 1
         _Brightness ("Brightness", Range(-1, 1)) = 0
         [Toggle] _InvertLuma ("Invert Luminance", Float) = 0
-        _PosterizeLevels ("Posterize Levels", Range(1, 50)) = 5
+        _PosterizeLevel ("Posterize Levels", Range(1, 50)) = 5
         _HueShift ("Hue Shift", Range(0, 1)) = 0
         _Saturation ("Saturation", Range(0, 2)) = 1
         _Value ("Value (Brightness)", Range(0, 2)) = 1
-        _PhaseSpeed ("Mono Phase Speed", Float) = 0.1
+        _PhaseSpeed ("Phase Speed", Float) = 0.1
         [Toggle] _FlipY ("Flip Y Axis", Float) = 0
 
         _QuadTreeMinDivisions ("Minimum Short-Axis Divisions", Range(1, 32)) = 4
         _QuadTreeMaxIterations ("Maximum Quadtree Depth", Range(1, 8)) = 6
         _QuadTreeThreshold ("Brightness Stop Threshold", Range(0, 1)) = 0.5
+        
+        _ColorTexUvIndex ("ColorTex Uv Index", Range(0, 1)) = 0
 
         _DepthLighting ("Cube Face Shading", Range(0, 1)) = 0.35
         _AmbientStrength ("Ambient Light Strength", Range(0, 2)) = 1
@@ -73,7 +75,6 @@ Shader "Hidden/ASCII Art Quadtree 3D"
             #include "Assets/Shaders/Common/Pattern.hlsl"
             #include "Assets/Shaders/Common/Transform.hlsl"
             #include "Assets/Shaders/Common/QuadTree.hlsl"
-            #include "Assets/Shaders/Common/Pattern.hlsl"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -124,7 +125,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 float _LineStrength;
                 float _PatternCount;
                 float _TextureCount;
-                float _PosterizeLevels;
+                float _PosterizeLevel;
                 float _FlipY;
                 float _QuadTreeMinDivisions;
                 float _QuadTreeMaxIterations;
@@ -140,6 +141,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 float _GridRows;
                 float _GridAspect;
                 float _InstanceBaseIndex;
+                float _ColorTexUvIndex;
             CBUFFER_END
 
             struct AdaptiveLeaf
@@ -311,7 +313,6 @@ Shader "Hidden/ASCII Art Quadtree 3D"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RealtimeLights.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/AmbientProbe.hlsl"
-            #include "Assets/Shaders/Common/Pattern.hlsl"
             #include "Assets/Shaders/Common/Level.hlsl"
             #include "Assets/Shaders/Common/MonoPhase.hlsl"
 
@@ -333,6 +334,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 float3 positionWS : TEXCOORD4;
                 float3 normalWS : TEXCOORD5;
                 float3 normalOS : TEXCOORD6;
+                float2 globalUv : TEXCOORD8;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -370,6 +372,11 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 output.leafCenterUv = leaf.quad.center;
                 output.leafBrightness = leaf.quad.brightness;
                 output.keep = leaf.keep;
+                // Expand the adaptive leaf across the cube face. The
+                // reversed local offset matches AsciiArt3D.shader's cube UV
+                // orientation and restores a continuous image-space UV.
+                output.globalUv = leaf.quad.center +
+                                  (0.5 - input.uv) * leaf.quad.size;
                 return output;
             }
 
@@ -382,14 +389,15 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 int patternCount = clamp((int)round(_PatternCount), 1, 10);
                 int textureCount = clamp((int)round(_TextureCount), 0, patternCount);
                 int patternIndex = GetPatternIndex(
-                    Posterize(brightness, _PosterizeLevels),
+                    Posterize(brightness, _PosterizeLevel),
                     patternCount);
 
                 half3 patternColor = ApplyHsvShift(
                     SamplePattern(input.uv, patternIndex, patternCount, textureCount));
-                float2 sampleUv = input.leafCenterUv * _MainTex_ST.xy + _MainTex_ST.zw;
+                float2 fullUv = lerp(input.leafCenterUv, input.globalUv, _ColorTexUvIndex);
+                float2 sampleUv = fullUv * _MainTex_ST.xy + _MainTex_ST.zw;
                 half3 sourceColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(sampleUv)).rgb;
-                half3 result = lerp(sourceColor, patternColor, mono_phase(input.leafCenterUv, _Time.y));
+                half3 result = lerp(sourceColor, patternColor, mono_phase(fullUv, _Time.y));
 
                 // Outline each adaptive cube face in screen-space pixels.
                 // fwidth(input.uv) converts the requested pixel width into

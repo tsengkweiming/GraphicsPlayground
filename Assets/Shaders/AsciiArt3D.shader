@@ -237,7 +237,7 @@ Shader "Hidden/ASCII Art 3D"
                 #endif
                 output.uv = input.uv;
                 output.cellId = cellId;
-                output.globalUv = (cellId + 1- input.uv) / gridSize;
+                output.globalUv = (cellId + 1 - input.uv) / gridSize;
                 output.cellCenterUv = (cellId + 0.5) / gridSize;
                 output.cellCenterUv.y = lerp(output.cellCenterUv.y, 1.0 - output.cellCenterUv.y, step(0.5, _FlipY));
                 output.normalOS = input.normalOS;
