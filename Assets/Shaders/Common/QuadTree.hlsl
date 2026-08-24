@@ -142,5 +142,83 @@ BrightnessQuadResult FindBrightnessQuadTree(
     return result;
 }
 
+// Vertex-stage variant for instanced geometry. Explicit LOD is required because
+// vertex shaders do not have fragment derivatives for implicit texture LOD.
+float QuadAverageLuminanceLod(
+    Texture2D sourceTexture,
+    SamplerState sourceSampler,
+    float2 center,
+    float2 size)
+{
+    float2 sampleOffset = size * 0.25;
+    float2 offsets[BRIGHTNESS_QUADTREE_SAMPLE_COUNT] =
+    {
+        float2(0.0, 0.0),
+        float2(-1.0, -1.0),
+        float2(1.0, -1.0),
+        float2(-1.0, 1.0),
+        float2(1.0, 1.0)
+    };
+
+    float3 colorSum = 0.0;
+
+    [unroll]
+    for (int i = 0; i < BRIGHTNESS_QUADTREE_SAMPLE_COUNT; ++i)
+    {
+        float2 sampleUv = saturate(center + offsets[i] * sampleOffset);
+        colorSum += SAMPLE_TEXTURE2D_LOD(
+            sourceTexture,
+            sourceSampler,
+            sampleUv,
+            0.0).rgb;
+    }
+
+    float3 average = colorSum / (float)BRIGHTNESS_QUADTREE_SAMPLE_COUNT;
+    return dot(average, float3(0.299, 0.587, 0.114));
+}
+
+BrightnessQuadResult FindBrightnessQuadTreeLod(
+    Texture2D sourceTexture,
+    SamplerState sourceSampler,
+    float2 position,
+    float2 minDivisions,
+    int maxIterations,
+    float stopBrightness)
+{
+    BrightnessQuadResult result;
+    result.center = 0.5;
+    result.size = 1.0;
+    result.divisions = max(round(minDivisions), 1.0);
+    result.brightness = 0.0;
+    result.depth = 0;
+
+    int safeIterations = clamp(maxIterations, 1, BRIGHTNESS_QUADTREE_MAX_ITERATIONS);
+    float threshold = saturate(stopBrightness);
+    float2 divisions = result.divisions;
+    float2 quadSize = 1.0 / divisions;
+
+    [loop]
+    for (int iteration = 0; iteration < BRIGHTNESS_QUADTREE_MAX_ITERATIONS; ++iteration)
+    {
+        result.center = (floor(position * divisions) + 0.5) / divisions;
+        result.size = quadSize;
+        result.divisions = divisions;
+        result.brightness = QuadAverageLuminanceLod(
+            sourceTexture,
+            sourceSampler,
+            result.center,
+            quadSize);
+        result.depth = iteration;
+
+        if (iteration + 1 >= safeIterations || result.brightness >= threshold)
+            break;
+
+        divisions *= 2.0;
+        quadSize *= 0.5;
+    }
+
+    return result;
+}
+
 
 #endif
