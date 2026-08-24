@@ -28,7 +28,7 @@ public class AsciiArtController : ShaderController
 
     private void Update()
     {
-        if (shaderMaterial == null) return;
+        if (!shaderMaterial) return;
 
         // Update resolution if changed
         if (!Mathf.Approximately(resolution, lastResolution))

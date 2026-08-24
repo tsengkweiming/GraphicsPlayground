@@ -62,9 +62,9 @@ float QuadAverageLuminance(
     Texture2D sourceTexture,
     SamplerState sourceSampler,
     float2 center,
-    float size)
+    float2 size)
 {
-    float sampleOffset = size * 0.25;
+    float2 sampleOffset = size * 0.25;
     float2 offsets[BRIGHTNESS_QUADTREE_SAMPLE_COUNT] =
     {
         float2(0.0, 0.0),
@@ -90,8 +90,8 @@ float QuadAverageLuminance(
 struct BrightnessQuadResult
 {
     float2 center;
-    float size;
-    float divisions;
+    float2 size;
+    float2 divisions;
     float brightness;
     int depth;
 };
@@ -103,7 +103,7 @@ BrightnessQuadResult FindBrightnessQuadTree(
     Texture2D sourceTexture,
     SamplerState sourceSampler,
     float2 position,
-    float minDivisions,
+    float2 minDivisions,
     int maxIterations,
     float stopBrightness)
 {
@@ -116,8 +116,8 @@ BrightnessQuadResult FindBrightnessQuadTree(
 
     int safeIterations = clamp(maxIterations, 1, BRIGHTNESS_QUADTREE_MAX_ITERATIONS);
     float threshold = saturate(stopBrightness);
-    float divisions = result.divisions;
-    float quadSize = 1.0 / divisions;
+    float2 divisions = result.divisions;
+    float2 quadSize = 1.0 / divisions;
 
     [loop]
     for (int iteration = 0; iteration < BRIGHTNESS_QUADTREE_MAX_ITERATIONS; ++iteration)

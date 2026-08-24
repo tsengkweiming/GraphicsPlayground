@@ -21,10 +21,10 @@ Shader "Hidden/ASCII Art"
 
         _PatternColor ("Pattern Color", Color) = (0, 0, 0, 1)
         _PatternBackgroundColor ("Pattern Background Color", Color) = (1, 1, 1, 1)
-        _Resolution ("Resolution (Grid Columns)", Range(10, 350)) = 60
+        _Resolution ("Maximum Quad Columns", Range(10, 350)) = 60
         _PosterizeLevels ("Posterize Levels", Range(-2, 50)) = 5
         _QuadTreeThreshold ("Quad Tree Brightness Stop", Range(0, 1)) = 0.5
-        _QuadTreeMinDivisions ("Quad Tree Minimum Divisions", Range(1, 32)) = 4
+        _QuadTreeMinDivisions ("Quad Tree Minimum Horizontal Divisions", Range(1, 32)) = 4
         _QuadTreeMaxIterations ("Quad Tree Maximum Depth", Range(1, 8)) = 6
 
         // --- Tonal range controls (stretch image luminance into full pattern range) ---
@@ -276,39 +276,47 @@ Shader "Hidden/ASCII Art"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float2 uv = input.uv;
-                float2 asp = _ScaledScreenParams.x /
-                             max(_ScaledScreenParams.y, 1.0);
+                float aspect = _ScaledScreenParams.x /
+                               max(_ScaledScreenParams.y, 1.0);
                 
-                float cols = _Resolution;
-                float rows = floor(cols / asp);
+                // Keep adaptive quadtree cells close to square in screen
+                // space. UV space is wider than it is tall on a 16:9 target,
+                // so the tree needs fewer rows than columns.
+                float2 minQuadDivisions = float2(
+                    _QuadTreeMinDivisions,
+                    max(round(_QuadTreeMinDivisions / aspect), 1.0));
 
-                // Current grid cell
-                float2 cellId = floor(uv * float2(cols, rows));
-                float2 cellUv = frac(uv * float2(cols, rows));
+                // _Resolution is the maximum horizontal detail requested by
+                // the controller. Since the tree doubles at every level, the
+                // nearest power-of-two depth is used as the actual cap.
+                float resolutionRatio = max(
+                    _Resolution / max(minQuadDivisions.x, 1.0),
+                    1.0);
+                int resolutionIterations = 1 + (int)round(log2(resolutionRatio));
+                int maxTreeIterations = min(
+                    (int)round(_QuadTreeMaxIterations),
+                    resolutionIterations);
 
-                // Replace the fixed cell-center lookup with an adaptive
-                // quadtree lookup. The ASCII pattern itself still uses the
-                // original regular grid through cellUv.
-                float2 cellCenterUv = (cellId + 0.5) / float2(cols, rows);
-
-                float2 analysisUv = cellCenterUv;
+                // Query from the current pixel, not the old fixed-grid cell
+                // center. This guarantees that the selected leaf, its outline,
+                // and the pattern UV all refer to the same quadtree node.
+                float2 analysisUv = uv;
                 BrightnessQuadResult quad = FindBrightnessQuadTree(
                     _MainTex,
                     sampler_MainTex,
                     analysisUv,
-                    _QuadTreeMinDivisions,
-                    (int)round(_QuadTreeMaxIterations),
+                    minQuadDivisions,
+                    maxTreeIterations,
                     _QuadTreeThreshold);
-                float divisions = quad.divisions;
                 // Draw the boundary of the selected adaptive quad. _ScaledScreenParams
                 // is the URP equivalent of Shadertoy's iResolution for this pass.
-                float2 normalizedQuadUV = frac(uv * divisions);
+                float2 normalizedQuadUV = frac(uv * quad.divisions);
                 float2 pixelWidth = _LineWidth / max(_ScaledScreenParams.xy, 1.0);
                 float2 distanceToEdge = min(normalizedQuadUV, 1.0 - normalizedQuadUV);
                 float lineMask =
                     max(
-                        step(distanceToEdge.x, pixelWidth.x * divisions),
-                        step(distanceToEdge.y, pixelWidth.y * divisions));
+                        step(distanceToEdge.x, pixelWidth.x * quad.divisions.x),
+                        step(distanceToEdge.y, pixelWidth.y * quad.divisions.y));
 
                 float lineBlend = saturate(lineMask * _LineStrength);
 
@@ -327,8 +335,10 @@ Shader "Hidden/ASCII Art"
                 // Map to the configured pattern ladder.
                 int imgIndex = GetIndex(posterized, patternCount);
 
-                // Sample the appropriate Pattern
-                half3 result = SamplePattern(cellUv, imgIndex, patternCount, textureCount);
+                // Sample the pattern in the selected quadtree leaf. This makes
+                // its width and height match the outlined quad at every depth.
+                float2 quadUv = frac(uv * quad.divisions);
+                half3 result = SamplePattern(quadUv, imgIndex, patternCount, textureCount);
 
                 // Apply HSV shift
                 result = ApplyHsvShift(result);
