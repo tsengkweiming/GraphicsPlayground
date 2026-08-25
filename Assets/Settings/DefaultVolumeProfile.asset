@@ -363,6 +363,9 @@ MonoBehaviour:
   cellSize:
     m_OverrideState: 1
     m_Value: {x: 0.5, y: 0.5, z: 0.5}
+  subdivisionStopThreshold:
+    m_OverrideState: 1
+    m_Value: 0.5
   zFactor2:
     m_OverrideState: 1
     m_Value: -0.04
@@ -922,6 +925,8 @@ MonoBehaviour:
   - {fileID: 5213978193297280659}
   - {fileID: 7506636855406941121}
   - {fileID: -160863568485389520}
+  - {fileID: 7190715035398612982}
+  - {fileID: 5191152074346013707}
 --- !u!114 &853819529557874667
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1326,6 +1331,52 @@ MonoBehaviour:
   intensity:
     m_OverrideState: 1
     m_Value: 0
+--- !u!114 &5191152074346013707
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db3a2fa341eb9f740b66e364a206b08f, type: 3}
+  m_Name: PixelSort
+  m_EditorClassIdentifier: 
+  active: 1
+  intensity:
+    m_OverrideState: 1
+    m_Value: 1
+  threshold:
+    m_OverrideState: 1
+    m_Value: 0.42
+  thresholdSoftness:
+    m_OverrideState: 1
+    m_Value: 0.08
+  streakLength:
+    m_OverrideState: 1
+    m_Value: 96
+  samples:
+    m_OverrideState: 1
+    m_Value: 24
+  brightnessPower:
+    m_OverrideState: 1
+    m_Value: 1.35
+  breakUp:
+    m_OverrideState: 1
+    m_Value: 0.12
+  horizontal:
+    m_OverrideState: 1
+    m_Value: 0
+  reverse:
+    m_OverrideState: 1
+    m_Value: 0
+  animationAmount:
+    m_OverrideState: 1
+    m_Value: 0
+  animationSpeed:
+    m_OverrideState: 1
+    m_Value: 0.35
 --- !u!114 &5213978193297280659
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1408,6 +1459,61 @@ MonoBehaviour:
   rounded:
     m_OverrideState: 1
     m_Value: 0
+--- !u!114 &7190715035398612982
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6dca5cd9fcabf5340b4671c54e37ecb1, type: 3}
+  m_Name: TemporalDiffusion
+  m_EditorClassIdentifier: 
+  active: 1
+  enableEffect:
+    m_OverrideState: 1
+    m_Value: 0
+  intensity:
+    m_OverrideState: 1
+    m_Value: 0.9
+  feedback:
+    m_OverrideState: 1
+    m_Value: 0.92
+  historyDecay:
+    m_OverrideState: 1
+    m_Value: 0.995
+  diffusionRadius:
+    m_OverrideState: 1
+    m_Value: 1.25
+  diffusionRate:
+    m_OverrideState: 1
+    m_Value: 0.18
+  chromaticSeparation:
+    m_OverrideState: 1
+    m_Value: 1.4
+  chromaticDirection:
+    m_OverrideState: 1
+    m_Value: {x: 1, y: 0.35}
+  flowStrength:
+    m_OverrideState: 1
+    m_Value: 0.45
+  flowScale:
+    m_OverrideState: 1
+    m_Value: 3
+  flowSpeed:
+    m_OverrideState: 1
+    m_Value: 0.2
+  motionResponse:
+    m_OverrideState: 1
+    m_Value: 3
+  cameraCutDistance:
+    m_OverrideState: 1
+    m_Value: 5
+  cameraCutAngle:
+    m_OverrideState: 1
+    m_Value: 50
 --- !u!114 &7506636855406941121
 MonoBehaviour:
   m_ObjectHideFlags: 3

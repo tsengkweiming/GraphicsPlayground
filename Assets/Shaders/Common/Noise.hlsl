@@ -316,4 +316,25 @@ float curlZ(float3 v, float d){
   		    -(snoise3D(float3(v.x,v.y+d,v.z)).x - snoise3D(float3(v.x,v.y-d,v.z)).x)
   	    ) /2/d;
 }
+
+static const float kCurlEpsilon = 1e-3;
+float3 curlNoise(float3 p)
+{
+    float3 dx = float3(kCurlEpsilon, 0.0, 0.0);
+    float3 dy = float3(0.0, kCurlEpsilon, 0.0);
+    float3 dz = float3(0.0, 0.0, kCurlEpsilon);
+
+    float3 dpdx0 = snoise3D(p - dx);
+    float3 dpdx1 = snoise3D(p + dx);
+    float3 dpdy0 = snoise3D(p - dy);
+    float3 dpdy1 = snoise3D(p + dy);
+    float3 dpdz0 = snoise3D(p - dz);
+    float3 dpdz1 = snoise3D(p + dz);
+
+    float x = dpdy1.z - dpdy0.z + dpdz1.y - dpdz0.y;
+    float y = dpdz1.x - dpdz0.x + dpdx1.z - dpdx0.z;
+    float z = dpdx1.y - dpdx0.y + dpdy1.x - dpdy0.x;
+
+    return float3(x, y, z) / kCurlEpsilon * 2.0;
+}
 #endif // NOISE_INCLUDED

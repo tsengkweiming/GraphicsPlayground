@@ -59,7 +59,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1140c271ff0d4a9fb0dbf9990b568c7b, type: 3}
   m_Name: DistortionEffect
   m_EditorClassIdentifier: 
-  active: 1
+  active: 0
   factor:
     m_OverrideState: 1
     m_Value: 0
@@ -72,25 +72,6 @@ MonoBehaviour:
   border:
     m_OverrideState: 1
     m_Value: 0
---- !u!114 &-4952256718840744177
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0a075addff9e6c34b8c8726f5805f769, type: 3}
-  m_Name: BlurVolumeComponent
-  m_EditorClassIdentifier: 
-  active: 0
-  horizontalBlur:
-    m_OverrideState: 1
-    m_Value: 0.015
-  verticalBlur:
-    m_OverrideState: 1
-    m_Value: 0.015
 --- !u!114 &-4481948942522665803
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -237,7 +218,6 @@ MonoBehaviour:
   - {fileID: -5263140126775973500}
   - {fileID: 7961328778503769437}
   - {fileID: 7591030262505439511}
-  - {fileID: -4952256718840744177}
   - {fileID: 5192013640843661728}
   - {fileID: 2950070339343678955}
 --- !u!114 &849379129802519247

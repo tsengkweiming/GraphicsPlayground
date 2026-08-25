@@ -20,15 +20,15 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         [Range(0f, 0.9f)] public float cellGap = 0.06f;
         public Color lineColor = Color.black;
         public float lineWidth = 1.0f;
-        public float lineStrength = 1.0f;
+        [Range(0f, 1f)] public float lineStrength = 1.0f;
         public float phaseSpeed = 0.1f;
         public float posterizeLevel = 5f;
         public Vector3 hsvAdjust = Vector3.one;
         [Range(0f, 1f)] public float colorTexUvIndex = 0f;
 
         [Header("Adaptive Quadtree")]
-        [Min(1)] public float minimumShortAxisDivisions = 4;
-        [Range(1, 8)] public float maximumDepth = 6;
+        [Min(1)] public int minimumShortAxisDivisions = 4;
+        [Range(1, 8)] public int maximumDepth = 6;
         [Range(0f, 1f)] public float brightnessStop = 0.5f;
 
         [Header("Object Depth")]
@@ -40,6 +40,12 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         [Min(0f)] public float depthMotionAmplitude;
         [Min(0f)] public float depthMotionSpeed = 1f;
         [Range(-180f, 180f)] public float rotationAmplitude;
+
+        [Header("Curl Noise Motion")]
+        public float curlNoiseAmplitude = 0.1f;
+        [Min(0f)] public float curlNoiseScale = 2f;
+        public float curlNoiseSpeed = 0.25f;
+        public Vector3 curlNoiseDirection = new Vector3(0.3f, 0.2f, 0.1f);
 
         [Header("Patterns")]
         public Texture2D[] textures;
@@ -56,6 +62,10 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     private static readonly int DepthMotionAmplitudeId = Shader.PropertyToID("_DepthMotionAmplitude");
     private static readonly int DepthMotionSpeedId = Shader.PropertyToID("_DepthMotionSpeed");
     private static readonly int RotationAmplitudeId = Shader.PropertyToID("_RotationAmplitude");
+    private static readonly int CurlNoiseAmplitudeId = Shader.PropertyToID("_CurlNoiseAmplitude");
+    private static readonly int CurlNoiseScaleId = Shader.PropertyToID("_CurlNoiseScale");
+    private static readonly int CurlNoiseSpeedId = Shader.PropertyToID("_CurlNoiseSpeed");
+    private static readonly int CurlNoiseDirectionId = Shader.PropertyToID("_CurlNoiseDirection");
     private static readonly int QuadTreeMinDivisionsId = Shader.PropertyToID("_QuadTreeMinDivisions");
     private static readonly int QuadTreeMaxIterationsId = Shader.PropertyToID("_QuadTreeMaxIterations");
     private static readonly int QuadTreeThresholdId = Shader.PropertyToID("_QuadTreeThreshold");
@@ -206,13 +216,17 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         _properties.SetFloat(GridColumnsId, _columns);
         _properties.SetFloat(GridRowsId, _rows);
         _properties.SetFloat(GridAspectId, param.gridWidth / Mathf.Max(param.gridHeight, 0.0001f));
-        _properties.SetFloat(QuadTreeMinDivisionsId, Mathf.Max(1, param.minimumShortAxisDivisions));
-        _properties.SetFloat(QuadTreeMaxIterationsId, Mathf.Clamp(param.maximumDepth, 1, 8));
+        _properties.SetInt(QuadTreeMinDivisionsId, param.minimumShortAxisDivisions);
+        _properties.SetInt(QuadTreeMaxIterationsId, param.maximumDepth);
         _properties.SetFloat(QuadTreeThresholdId, Mathf.Clamp01(param.brightnessStop));
         _properties.SetFloat(MotionActiveThresholdId, param.motionActiveThreshold);
         _properties.SetFloat(DepthMotionAmplitudeId, Mathf.Max(0f, param.depthMotionAmplitude));
         _properties.SetFloat(DepthMotionSpeedId, Mathf.Max(0f, param.depthMotionSpeed));
         _properties.SetFloat(RotationAmplitudeId, param.rotationAmplitude * Mathf.Deg2Rad);
+        _properties.SetFloat(CurlNoiseAmplitudeId, param.curlNoiseAmplitude);
+        _properties.SetFloat(CurlNoiseScaleId, Mathf.Max(0f, param.curlNoiseScale));
+        _properties.SetFloat(CurlNoiseSpeedId, param.curlNoiseSpeed);
+        _properties.SetVector(CurlNoiseDirectionId, param.curlNoiseDirection);
         _properties.SetFloat(LineWidthId, param.lineWidth);
         _properties.SetFloat(LineStrengthId, param.lineStrength);
         _properties.SetColor(LineColorId, param.lineColor);

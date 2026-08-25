@@ -36,8 +36,8 @@ Shader "Hidden/ASCII Art Quadtree 3D"
         _PhaseSpeed ("Phase Speed", Float) = 0.1
         [Toggle] _FlipY ("Flip Y Axis", Float) = 0
 
-        _QuadTreeMinDivisions ("Minimum Short-Axis Divisions", Range(1, 32)) = 4
-        _QuadTreeMaxIterations ("Maximum Quadtree Depth", Range(1, 8)) = 6
+        [IntRange] _QuadTreeMinDivisions ("Minimum Short-Axis Divisions", Range(1, 32)) = 4
+        [IntRange] _QuadTreeMaxIterations ("Maximum Quadtree Depth", Range(1, 8)) = 6
         _QuadTreeThreshold ("Brightness Stop Threshold", Range(0, 1)) = 0.5
         
         _ColorTexUvIndex ("ColorTex Uv Index", Range(0, 1)) = 0
@@ -49,6 +49,11 @@ Shader "Hidden/ASCII Art Quadtree 3D"
         _DepthMotionSpeed ("Depth Motion Speed", Float) = 1
         _RotationAmplitude ("Rotation Amplitude (Radians)", Float) = 0
         _MotionActiveThreshold ("Motion Active Threshold", Range(0, 1)) = 0
+        
+        _CurlNoiseAmplitude ("Curl Noise Amplitude", Float) = 0.1
+        _CurlNoiseScale ("Curl Noise Scale", Float) = 2.0
+        _CurlNoiseSpeed ("Curl Noise Speed", Float) = 0.25
+        _CurlNoiseDirection ("Curl Noise Direction", Vector) = (0.3, 0.2, 0.1, 0)
 
         [HideInInspector] _GridColumns ("Grid Columns", Float) = 60
         [HideInInspector] _GridRows ("Grid Rows", Float) = 34
@@ -71,6 +76,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
 
         HLSLINCLUDE
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/Common/Noise.hlsl"
             #include "Assets/Shaders/Common/Random.hlsl"
             #include "Assets/Shaders/Common/Pattern.hlsl"
             #include "Assets/Shaders/Common/Transform.hlsl"
@@ -142,6 +148,10 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 float _GridAspect;
                 float _InstanceBaseIndex;
                 float _ColorTexUvIndex;
+                float _CurlNoiseAmplitude;
+                float _CurlNoiseScale;
+                float _CurlNoiseSpeed;
+                float4 _CurlNoiseDirection;
             CBUFFER_END
 
             struct AdaptiveLeaf
@@ -154,7 +164,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
 
             float2 MinimumQuadDivisions()
             {
-                float shortAxis = max(round(_QuadTreeMinDivisions), 1.0);
+                float shortAxis = max(floor(_QuadTreeMinDivisions), 1.0);
                 float2 landscape = float2(
                     max(round(shortAxis * _GridAspect), 1.0),
                     shortAxis);
@@ -166,9 +176,15 @@ Shader "Hidden/ASCII Art Quadtree 3D"
 
             int MaximumQuadIterations(float2 minDivisions)
             {
-                float ratio = max(_GridColumns / max(minDivisions.x, 1.0), 1.0);
-                int resolutionDepth = 1 + (int)round(log2(ratio));
-                return min((int)round(_QuadTreeMaxIterations), resolutionDepth);
+                // A quadtree iteration doubles both axes. Cap the depth by
+                // the smaller grid ratio so leaf representatives remain
+                // unique grid cells and cannot create empty scan lines.
+                float ratioX = max(_GridColumns / max(minDivisions.x, 1.0), 1.0);
+                float ratioY = max(_GridRows / max(minDivisions.y, 1.0), 1.0);
+                float ratio = max(min(ratioX, ratioY), 1.0);
+                int resolutionDepth = 1 + (int)floor(log2(ratio));
+                int requestedDepth = (int)floor(max(_QuadTreeMaxIterations, 1.0));
+                return min(requestedDepth, resolutionDepth);
             }
 
             float2 SourceUv(float2 uv)
@@ -222,9 +238,44 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 return float3(active, phase, frequency);
             }
 
+            float3 CurlDisplacement(float3 seed, float time)
+            {
+                float3 noisePosition =
+                    seed * _CurlNoiseScale +
+                    _CurlNoiseDirection.xyz * time * _CurlNoiseSpeed;
+
+                float3 flow = curlNoise(noisePosition);
+                flow = clamp(flow, -1.0, 1.0);
+
+                return flow * _CurlNoiseAmplitude;
+            }
+
             float3 RotateInstanceCenter(float3 positionWS, float3 centerWS, float angle)
             {
                 return centerWS + mul(RotateZ(angle), positionWS - centerWS);
+            }
+
+            float3 AddMotion(
+                float3 position,
+                float motionSignal,
+                float motionActive,
+                float2 cellCenter,
+                float globalIndex)
+            {
+                float3 curlSeed = float3(
+                    cellCenter.x,
+                    cellCenter.y,
+                    hash11(globalIndex * 0.713 + 11.7));
+                float3 curlOffsetOS = CurlDisplacement(curlSeed, _Time.y) * motionActive;
+                position += TransformObjectToWorldDir(curlOffsetOS);
+
+                float3 depthDirectionWS = normalize(TransformObjectToWorldDir(float3(0.0, 0.0, 1.0)));
+                float3 centerWS = TransformObjectToWorld(float3(0.0, 0.0, 0.0));
+                position = RotateInstanceCenter(
+                        position,
+                        centerWS,
+                        motionSignal * _RotationAmplitude);
+                return position + depthDirectionWS * motionSignal * _DepthMotionAmplitude;
             }
 
             float Posterize(float brightness, float levels)
@@ -350,14 +401,13 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 float motionSignal = motion.x * sin(_Time.y * _DepthMotionSpeed * motion.z + motion.y);
 
                 float3 positionWS = TransformObjectToWorld(LeafPositionOS(input.positionOS.xyz, leaf));
-                float3 centerWS = TransformObjectToWorld(float3(0.0, 0.0, 0.0));
-                positionWS = RotateInstanceCenter(
+                positionWS = AddMotion(
                     positionWS,
-                    centerWS,
-                    motionSignal * _RotationAmplitude);
-                float3 depthDirectionWS = normalize(TransformObjectToWorldDir(float3(0.0, 0.0, 1.0)));
-                positionWS += depthDirectionWS * motionSignal * _DepthMotionAmplitude;
-
+                    motionSignal,
+                    motion.x,
+                    leaf.cellCenter,
+                    globalIndex);
+                
                 VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS);
                 normalInput.normalWS = normalize(mul(
                     RotateZ(motionSignal * _RotationAmplitude),
@@ -480,7 +530,18 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 UNITY_SETUP_INSTANCE_ID(input);
 
                 AdaptiveLeaf leaf = GetAdaptiveLeaf(input.instanceID);
+                float globalIndex = (float)input.instanceID + max(_InstanceBaseIndex, 0.0);
+                float3 motion = InstanceMotionData(globalIndex, _MotionActiveThreshold);
+                float motionSignal = motion.x * sin(_Time.y * _DepthMotionSpeed * motion.z + motion.y);
+
                 float3 positionWS = TransformObjectToWorld(LeafPositionOS(input.positionOS.xyz, leaf));
+                positionWS = AddMotion(
+                    positionWS,
+                    motionSignal,
+                    motion.x,
+                    leaf.cellCenter,
+                    globalIndex);
+
                 float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
 
                 #if _CASTING_PUNCTUAL_LIGHT_SHADOW
