@@ -152,6 +152,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 float _CurlNoiseScale;
                 float _CurlNoiseSpeed;
                 float4 _CurlNoiseDirection;
+                float3 _HsvAdjust;
             CBUFFER_END
 
             struct AdaptiveLeaf
@@ -443,7 +444,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                     patternCount);
 
                 half3 patternColor = ApplyHsvShift(
-                    SamplePattern(input.uv, patternIndex, patternCount, textureCount));
+                    SamplePattern(input.uv, patternIndex, patternCount, textureCount), _HsvAdjust);
                 float2 fullUv = lerp(input.leafCenterUv, input.globalUv, _ColorTexUvIndex);
                 float2 sampleUv = fullUv * _MainTex_ST.xy + _MainTex_ST.zw;
                 half3 sourceColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(sampleUv)).rgb;

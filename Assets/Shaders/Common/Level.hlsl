@@ -26,6 +26,15 @@ half3 ApplyHsvShift(half3 rgb)
     return HsvToRgb(hsv);
 }
 
+half3 ApplyHsvShift(half3 rgb, half3 hsvAdjust)
+{
+    float3 hsv = RgbToHsv(rgb);
+    hsv.x = frac(hsv.x + hsvAdjust.x);
+    hsv.y = saturate(hsv.y * hsvAdjust.y);
+    hsv.z = saturate(hsv.z * hsvAdjust.z);
+    return HsvToRgb(hsv);
+}
+
 // Remap raw luminance so the image's usable tonal range fills 0-1.
 // Stretches [InputBlack, InputWhite] to full range, then applies
 // gamma, contrast (pivoted around mid-grey) and a brightness offset.

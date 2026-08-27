@@ -13,6 +13,11 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     [System.Serializable]
     public class Parameters
     {
+        [Range(1, 10)] public int patternCount = 5;
+        [Range(0, 10)] public int textureCount = 4;
+        public Color patternColor = Color.black;
+        public Color patternBackgroundColor = Color.white;
+        
         [Header("Grid")]
         [Min(1)] public int resolution = 60;
         [Min(0.01f)] public float gridWidth = 10f;
@@ -54,6 +59,10 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
 
     private const int MaxInstancesPerDraw = 511;
 
+    private static readonly int PatternCountId = Shader.PropertyToID("_PatternCount");
+    private static readonly int TextureCountId = Shader.PropertyToID("_TextureCount");
+    private static readonly int PatternColorId = Shader.PropertyToID("_PatternColor");
+    private static readonly int PatternBackgroundColorId = Shader.PropertyToID("_PatternBackgroundColor");
     private static readonly int GridColumnsId = Shader.PropertyToID("_GridColumns");
     private static readonly int GridRowsId = Shader.PropertyToID("_GridRows");
     private static readonly int GridAspectId = Shader.PropertyToID("_GridAspect");
@@ -213,6 +222,10 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
             return;
 
         _properties.Clear();
+        _properties.SetInt(PatternCountId, param.patternCount);
+        _properties.SetInt(TextureCountId, param.textureCount);
+        _properties.SetColor(PatternColorId, param.patternColor);
+        _properties.SetColor(PatternBackgroundColorId, param.patternBackgroundColor);
         _properties.SetFloat(GridColumnsId, _columns);
         _properties.SetFloat(GridRowsId, _rows);
         _properties.SetFloat(GridAspectId, param.gridWidth / Mathf.Max(param.gridHeight, 0.0001f));
