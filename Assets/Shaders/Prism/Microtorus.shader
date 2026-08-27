@@ -4,6 +4,7 @@ Shader "Unlit/Microtorus"
     {
         _MainTex ("Texture", 2D) = "white" {}
         [Toggle(Direction Switch)] _DirSwitch ("Direction Switch", Float) = 0
+        _Size ("Size", Float) = 0.1
         _SwipeOffset ("Swipe Offset", Vector) = (0, 0, 0, 0)
         _SwipeWarp ("Swipe Warp", Vector) = (1, 0, 0, 0)
     }
@@ -43,6 +44,7 @@ Shader "Unlit/Microtorus"
             float _DirSwitch;
             float4 _SwipeOffset;
             float4 _SwipeWarp;
+            float _Size;
 
             v2f vert(appdata v)
             {
@@ -76,7 +78,7 @@ Shader "Unlit/Microtorus"
                 float z = 5.;
                 
                 //Center and scale uvs
-                float2 coord = (IN.vertex.xy - .5*_ScreenParams.xy)/_ScreenParams.y/.1;
+                float2 coord = (IN.vertex.xy - .5*_ScreenParams.xy)/_ScreenParams.y/_Size;
                 float2 swipeOffset = _SwipeOffset.xy;
                 // return float4(coord/20, 0, 1);
                 // coord = frac(coord/40) - 0.5;

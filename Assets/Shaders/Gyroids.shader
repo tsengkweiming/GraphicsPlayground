@@ -3,6 +3,7 @@ Shader "Unlit/Gyroids"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        _Size ("Size", Float) = 1
         _PatternMode ("Pattern Mode", Range(0, 4)) = 0
         _ShapeBlend ("Shape Blend", Range(0, 1)) = 0.25
         _Scale ("Pattern Scale", Range(0, 12)) = 4
@@ -12,6 +13,7 @@ Shader "Unlit/Gyroids"
         _ColorMode ("Color Mode", Range(0, 4)) = 1
         _ColorFrequency ("Color Frequency", Range(0.05, 3)) = 1
         _ColorContrast ("Color Contrast", Range(0, 2)) = 1
+        _VignetteStrength ("Vignette Strength", Range(0, 1)) = 1
         _Palette_A ("Palette_A", Vector) = (0.45, 0.45, 0.45, 0)
         _Palette_B ("Palette_B", Vector) = (0.35, 0.35, 0.35, 0)
         _Palette_C ("Palette_C", Vector) = (1, 1, 1, 1)
@@ -60,7 +62,9 @@ Shader "Unlit/Gyroids"
             float _ColorMode;
             float _ColorFrequency;
             float _ColorContrast;
+            float _VignetteStrength;
             float _MoveTime;
+            float _Size;
             float3 _Palette_A;
             float3 _Palette_B;
             float3 _Palette_C;
@@ -213,7 +217,7 @@ Shader "Unlit/Gyroids"
 
             fixed4 frag (v2f IN) : SV_Target
             {
-                float2 uv = (IN.vertex.xy - 0.5 * _ScreenParams.xy) / _ScreenParams.y;
+                float2 uv = (IN.vertex.xy - 0.5 * _ScreenParams.xy) / _ScreenParams.y / _Size;
                 float3 init = float3(_Time.y*_MoveTime,1.5,.3);
                 float3 cam = normalize(float3(1., uv ));
 
@@ -242,7 +246,9 @@ Shader "Unlit/Gyroids"
                 float3 col = spectralColor(shapeBands, p, n, cam);
                 col = (fres+col)*ao;
                 col = lerp(col, 0., !hit ? 1. : smoothstep(0.,8.,distance(p,init)));
-                col = lerp(0,col, vign+.1);
+                float vignetteMask = saturate(vign + 0.1);
+                float vignetteAmount = lerp(1.0, vignetteMask, saturate(_VignetteStrength));
+                col *= vignetteAmount;
                 col = smoothstep(0.,1.+.3*sin(_Time.y+p.x*4.+p.z*4.),col);
                 return float4(col, 1.0);
             }

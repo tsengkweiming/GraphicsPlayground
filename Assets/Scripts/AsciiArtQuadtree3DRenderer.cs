@@ -28,6 +28,10 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         [Range(0f, 1f)] public float lineStrength = 1.0f;
         public float phaseSpeed = 0.1f;
         public float posterizeLevel = 5f;
+        [Range(0.1f, 5)] public float gamma = 1f;
+        [Range(0, 4)] public float contrast = 1f;
+        [Range(-1, 1)] public float brightness = 0f;
+        
         public Vector3 hsvAdjust = Vector3.one;
         [Range(0f, 1f)] public float colorTexUvIndex = 0f;
 
@@ -84,6 +88,9 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     private static readonly int PhaseSpeedId = Shader.PropertyToID("_PhaseSpeed");
     private static readonly int ColorTexUvIndexId = Shader.PropertyToID("_ColorTexUvIndex");
     private static readonly int PosterizeLevelId = Shader.PropertyToID("_PosterizeLevel");
+    private static readonly int GammaId = Shader.PropertyToID("_Gamma");
+    private static readonly int ContrastId = Shader.PropertyToID("_Contrast");
+    private static readonly int BrightnessId = Shader.PropertyToID("_Brightness");
     private static readonly int HsvAdjustId = Shader.PropertyToID("_HsvAdjust");
 
     [SerializeField] private Mesh mesh;
@@ -246,6 +253,9 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         _properties.SetFloat(PhaseSpeedId, param.phaseSpeed);
         _properties.SetFloat(ColorTexUvIndexId, param.colorTexUvIndex);
         _properties.SetFloat(PosterizeLevelId, param.posterizeLevel);
+        _properties.SetFloat(GammaId, param.gamma);
+        _properties.SetFloat(ContrastId, param.contrast);
+        _properties.SetFloat(BrightnessId, param.brightness);
         _properties.SetVector(HsvAdjustId, param.hsvAdjust);
 
         if (param.textures != null)

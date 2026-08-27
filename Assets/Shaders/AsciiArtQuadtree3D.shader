@@ -306,44 +306,71 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 return color;
             }
 
+            // Assign styles in balanced groups of four. The hash changes the
+            // starting point of each group, while modulo guarantees that all
+            // four styles are represented once per complete group.
+            int GetProceduralStyle(int patternIndex, int patternCount)
+            {
+                int groupIndex = patternIndex / 4;
+                int groupSlot = patternIndex - groupIndex * 4;
+                int randomOffset = (int)floor(
+                    hash11((float)(groupIndex + 1) * 17.31) * 4.0);
+                return (groupSlot + randomOffset) % 4;
+            }
+
             half3 SampleProceduralPattern(float2 uv, int patternIndex, float darkness)
             {
-                float seed = (float)patternIndex + 1.0;
-                float style = floor(hash11(seed * 17.31) * 4.0);
+                float seed = (float)patternIndex;
+                int patternCount = 4;
+                int style = GetProceduralStyle(patternIndex, patternCount);
+                // float style = floor(hash11(seed) * 4.0);//seed;//
                 float scale = lerp(3.0, 11.0, hash11(seed * 29.17));
                 float phase = hash11(seed * 43.73);
-                float mask;
+                float3 mask = 0;
 
                 if (style < 1.0)
                 {
-                    float radius = 0.5 * sqrt(saturate(darkness) / 0.78539816);
-                    mask = pattern_circle_mask(uv, scale, radius, _Time.y * 0.08 * phase);
+                    float diagonal = frac(dot(uv + _Time.y * (darkness - 0.5 > 0 ? 1 : -1) * lerp(0, 0.3, patternIndex / float(patternCount)), normalize(float2(1.0, 1.0)) * scale) + phase);
+                    mask = step(diagonal, darkness);
+                    // mask = pattern_random_mask(uv, scale, seed, darkness);
                 }
                 else if (style < 2.0)
                 {
-                    mask = step(frac(uv.x * scale + phase + _Time.y * 0.03), darkness);
+                    float radius = 0.3 * sqrt(max(darkness, 0.2) / 0.78539816);
+                    // mask = pattern_circle_mask(uv, 3, radius, _Time.y * 0.08 * phase);
+                    mask = 1 - pattern_circles(uv, 3, radius, 0, hash11(darkness));
                 }
                 else if (style < 3.0)
                 {
-                    mask = pattern_random_mask(uv, scale, seed, darkness);
+                    
+                    phase = clamp(seed, 0.1, 0.9);
+                    scale = lerp(11.0, 3.0, hash11(seed * 29.17));
+                    mask = pattern_ring(uv, scale, _Time.y * 0.8 * phase);
+                    // mask = step(frac(uv.x * scale + phase + _Time.y * 0.03), max(darkness,0.1));
                 }
-                else
+                else if (style < 4.0)
                 {
-                    float diagonal = frac(dot(uv, normalize(float2(1.0, 1.0)) * scale) + phase);
-                    mask = step(diagonal, darkness);
+                    scale = 6 + 3 * int(darkness * 5);
+                    mask = pattern_grid(uv, scale);
                 }
 
                 return lerp(_PatternBackgroundColor, _PatternColor, saturate(mask));
             }
 
-            half3 SamplePattern(float2 uv, int patternIndex, int patternCount, int textureCount)
+            half3 SamplePattern(float2 uv, float brightness)
             {
+                int patternCount = clamp((int)round(_PatternCount), 1, 10);
+                int textureCount = clamp((int)round(_TextureCount), 0, patternCount);
+                int patternIndex = GetPatternIndex(
+                    brightness, /*Posterize(brightness, _PosterizeLevel),*/
+                    patternCount);
+                
                 int safeCount = max(patternCount, 1);
                 int safeTextureCount = clamp(textureCount, 0, safeCount);
                 if (patternIndex < safeTextureCount)
                     return SampleTexturePattern(uv, patternIndex);
 
-                float darkness = 1.0 - (float)patternIndex / max((float)(safeCount - 1), 1.0);
+                float darkness = 1.0 - brightness; //(float)patternIndex / max((float)(safeCount - 1), 1.0);
                 return SampleProceduralPattern(uv, patternIndex - safeTextureCount, darkness);
             }
         ENDHLSL
@@ -437,14 +464,8 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 clip(input.keep - 0.5);
 
                 float brightness = AdjustLuminance(input.leafBrightness);
-                int patternCount = clamp((int)round(_PatternCount), 1, 10);
-                int textureCount = clamp((int)round(_TextureCount), 0, patternCount);
-                int patternIndex = GetPatternIndex(
-                    Posterize(brightness, _PosterizeLevel),
-                    patternCount);
-
-                half3 patternColor = ApplyHsvShift(
-                    SamplePattern(input.uv, patternIndex, patternCount, textureCount), _HsvAdjust);
+                half3 patternColor = ApplyHsvShift(SamplePattern(input.uv, brightness), _HsvAdjust);
+                
                 float2 fullUv = lerp(input.leafCenterUv, input.globalUv, _ColorTexUvIndex);
                 float2 sampleUv = fullUv * _MainTex_ST.xy + _MainTex_ST.zw;
                 half3 sourceColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(sampleUv)).rgb;

@@ -35,6 +35,7 @@ Material:
     - _PrismRadius: 5
     - _RepeatScale: 0.25
     - _ShapeMode: 5.27
+    - _Size: 0.72
     - _StepScale: 1.14
     - _WarpStrength: 0
     m_Colors: []

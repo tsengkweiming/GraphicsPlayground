@@ -3,6 +3,7 @@ Shader "Unlit/PrismDream"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        _Size ("Size", Float) = 0.1
         _ShapeMode ("Shape Mode", Range(0, 6)) = 0
         _PatternBlend ("Pattern Blend", Range(0, 1)) = 0
         _RepeatScale ("Repeat Scale", Range(0.25, 4)) = 1.15
@@ -60,6 +61,7 @@ Shader "Unlit/PrismDream"
                 float _StepScale;
                 float _ColorSpread;
                 float _Exposure;
+                float _Size;
             CBUFFER_END
 
             Varyings vert(Attributes IN)
@@ -170,7 +172,7 @@ Shader "Unlit/PrismDream"
                 float dist = 1.0;
                 float3 p = 0.0;
                 float4 col = 0.0;
-                float2 coord = (IN.positionCS.xy - 0.5 * _ScreenParams.xy) / _ScreenParams.y / 0.1;
+                float2 coord = (IN.positionCS.xy - 0.5 * _ScreenParams.xy) / _ScreenParams.y / _Size;
 
                 [loop]
                 for (int i = 0; i < 100; i++)
