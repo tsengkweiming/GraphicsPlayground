@@ -1,0 +1,259 @@
+#pragma kernel InitializeAgents
+#pragma kernel ClearSimulation
+#pragma kernel ClearCounters
+#pragma kernel MoveAgents
+#pragma kernel UpdateTrail
+
+struct Agent
+{
+    float2 position;
+    float heading;
+    float progress;
+};
+
+RWStructuredBuffer<Agent> _Agents;
+Texture2D<float> _TrailRead;
+RWTexture2D<float> _TrailA;
+RWTexture2D<float> _TrailB;
+RWTexture2D<float> _TrailWrite;
+RWTexture2D<uint> _ParticleCounters;
+RWTexture2D<float> _ParticleDensity;
+
+int2 _Resolution;
+int _AgentCount;
+int _Seed;
+int _Iteration;
+int _SpawnShape;
+float2 _SpawnCenter;
+float _SpawnRadius;
+float _SpawnThickness;
+
+float3 _SensorDistanceCurve;
+float3 _SensorAngleCurve;
+float3 _RotationAngleCurve;
+float3 _MoveDistanceCurve;
+float _ResponseProbeForwardOffset;
+float _ResponseProbeVerticalOffset;
+float _SensedValueScale;
+int _BilinearSensing;
+float _TurnNoise;
+float _RespawnChance;
+
+float _Diffusion;
+float _Decay;
+float _DepositStrength;
+int _DepositCountLimit;
+float _TrailValueLimit;
+
+static const float kTau = 6.283185307179586;
+
+uint Hash(uint value)
+{
+    value ^= value >> 16;
+    value *= 0x7feb352du;
+    value ^= value >> 15;
+    value *= 0x846ca68bu;
+    value ^= value >> 16;
+    return value;
+}
+
+float Random01(uint value)
+{
+    return (Hash(value) >> 8) * (1.0 / 16777216.0);
+}
+
+float2 Random02(uint value)
+{
+    return float2(Random01(value), Random01(value ^ 0x9e3779b9u));
+}
+
+float2 HeadingDirection(float heading)
+{
+    float sineValue;
+    float cosineValue;
+    sincos(heading, sineValue, cosineValue);
+    return float2(cosineValue, sineValue);
+}
+
+int2 WrapPixel(int2 pixel)
+{
+    float2 repetitions = floor((float2)pixel / max((float2)_Resolution, 1.0));
+    return pixel - (int2)repetitions * _Resolution;
+}
+
+float2 WrapPosition(float2 position)
+{
+    float2 size = (float2)_Resolution;
+    return position - floor(position / max(size, 1.0)) * size;
+}
+
+float SampleTrailNearest(float2 position)
+{
+    int2 pixel = WrapPixel((int2)floor(position + 0.5));
+    return _TrailRead.Load(int3(pixel, 0));
+}
+
+float SampleTrailBilinear(float2 position)
+{
+    float2 basePosition = floor(position);
+    float2 fractionValue = frac(position);
+    int2 pixel00 = WrapPixel((int2)basePosition);
+    int2 pixel10 = WrapPixel((int2)basePosition + int2(1, 0));
+    int2 pixel01 = WrapPixel((int2)basePosition + int2(0, 1));
+    int2 pixel11 = WrapPixel((int2)basePosition + int2(1, 1));
+
+    float value00 = _TrailRead.Load(int3(pixel00, 0));
+    float value10 = _TrailRead.Load(int3(pixel10, 0));
+    float value01 = _TrailRead.Load(int3(pixel01, 0));
+    float value11 = _TrailRead.Load(int3(pixel11, 0));
+    float row0 = lerp(value00, value10, fractionValue.x);
+    float row1 = lerp(value01, value11, fractionValue.x);
+    return lerp(row0, row1, fractionValue.y);
+}
+
+float SampleTrail(float2 position)
+{
+    return _BilinearSensing != 0 ? SampleTrailBilinear(position) : SampleTrailNearest(position);
+}
+
+float EvaluateCurve(float3 curve, float signal)
+{
+    return curve.x + curve.y * pow(max(signal, 1e-6), max(curve.z, 0.01));
+}
+
+float2 SpawnPosition(uint agentIndex, uint salt)
+{
+    uint randomSeed = Hash(agentIndex ^ (uint)_Seed ^ salt);
+    float2 randomValue = Random02(randomSeed);
+    float angle = kTau * randomValue.x;
+    float2 radialDirection = HeadingDirection(angle);
+    float minDimension = (float)min(_Resolution.x, _Resolution.y);
+    float radiusPixels = 0.5 * minDimension * _SpawnRadius;
+    float2 centerPixels = saturate(_SpawnCenter) * (float2)_Resolution;
+
+    float2 randomPosition = randomValue * (float2)_Resolution;
+    float2 discPosition = centerPixels + radialDirection * (sqrt(randomValue.y) * radiusPixels);
+    float ringScale = 1.0 + (randomValue.y * 2.0 - 1.0) * _SpawnThickness;
+    float2 ringPosition = centerPixels + radialDirection * (radiusPixels * ringScale);
+    float bandHalfWidth = 0.5 * minDimension * _SpawnThickness;
+    float2 bandPosition = float2(randomValue.x * _Resolution.x, centerPixels.y + (randomValue.y * 2.0 - 1.0) * bandHalfWidth);
+
+    float2 position = randomPosition;
+    position = _SpawnShape == 1 ? discPosition : position;
+    position = _SpawnShape == 2 ? ringPosition : position;
+    position = _SpawnShape == 3 ? bandPosition : position;
+    return WrapPosition(position);
+}
+
+[numthreads(256, 1, 1)]
+void InitializeAgents(uint agentIndex : SV_DispatchThreadID)
+{
+    if (agentIndex >= (uint)_AgentCount)
+        return;
+
+    uint randomSeed = Hash(agentIndex ^ (uint)_Seed);
+    Agent agent;
+    agent.position = SpawnPosition(agentIndex, 0x51ed270bu);
+    agent.heading = Random01(randomSeed ^ 0xa511e9b3u) * kTau;
+    agent.progress = Random01(randomSeed ^ 0x63d83595u);
+    _Agents[agentIndex] = agent;
+}
+
+[numthreads(8, 8, 1)]
+void ClearSimulation(uint2 pixel : SV_DispatchThreadID)
+{
+    if (any(pixel >= (uint2)_Resolution))
+        return;
+
+    _TrailA[pixel] = 0.0;
+    _TrailB[pixel] = 0.0;
+    _ParticleCounters[pixel] = 0u;
+    _ParticleDensity[pixel] = 0.0;
+}
+
+[numthreads(8, 8, 1)]
+void ClearCounters(uint2 pixel : SV_DispatchThreadID)
+{
+    if (any(pixel >= (uint2)_Resolution))
+        return;
+
+    _ParticleCounters[pixel] = 0u;
+}
+
+[numthreads(256, 1, 1)]
+void MoveAgents(uint agentIndex : SV_DispatchThreadID)
+{
+    if (agentIndex >= (uint)_AgentCount)
+        return;
+
+    Agent agent = _Agents[agentIndex];
+    uint iterationSeed = Hash(agentIndex ^ (uint)_Seed ^ ((uint)_Iteration * 0x9e3779b9u));
+
+    float shouldRespawn = step(Random01(iterationSeed ^ 0x68bc21ebu), _RespawnChance);
+    float2 respawnPosition = SpawnPosition(agentIndex, iterationSeed ^ 0x02e5be93u);
+    float respawnHeading = Random01(iterationSeed ^ 0x967a889bu) * kTau;
+    agent.position = lerp(agent.position, respawnPosition, shouldRespawn);
+    agent.heading = lerp(agent.heading, respawnHeading, shouldRespawn);
+
+    float2 forwardDirection = HeadingDirection(agent.heading);
+    float2 responseProbe = agent.position
+        + forwardDirection * _ResponseProbeForwardOffset
+        + float2(0.0, _ResponseProbeVerticalOffset);
+    float responseSignal = saturate(SampleTrail(responseProbe) * _SensedValueScale);
+
+    float sensorDistance = max(EvaluateCurve(_SensorDistanceCurve, responseSignal), 0.0);
+    float sensorAngle = EvaluateCurve(_SensorAngleCurve, responseSignal);
+    float rotationAngle = EvaluateCurve(_RotationAngleCurve, responseSignal);
+    float movementDistance = max(EvaluateCurve(_MoveDistanceCurve, responseSignal), 0.0);
+
+    float sensedForward = SampleTrail(agent.position + HeadingDirection(agent.heading) * sensorDistance);
+    float sensedLeft = SampleTrail(agent.position + HeadingDirection(agent.heading + sensorAngle) * sensorDistance);
+    float sensedRight = SampleTrail(agent.position + HeadingDirection(agent.heading - sensorAngle) * sensorDistance);
+
+    const float comparisonEpsilon = 1e-6;
+    float forwardWins = step(sensedLeft, sensedForward) * step(sensedRight, sensedForward);
+    float forwardLoses = step(sensedForward + comparisonEpsilon, sensedLeft)
+        * step(sensedForward + comparisonEpsilon, sensedRight);
+    float sideDirection = sign(sensedLeft - sensedRight);
+    float randomDirection = Random01(iterationSeed ^ 0xb5297a4du) < 0.5 ? -1.0 : 1.0;
+    float turnDirection = (1.0 - forwardWins) * lerp(sideDirection, randomDirection, forwardLoses);
+    float turnJitter = (Random01(iterationSeed ^ 0x1b56c4e9u) * 2.0 - 1.0) * _TurnNoise;
+
+    agent.heading += turnDirection * rotationAngle + turnJitter;
+    agent.heading -= floor(agent.heading / kTau) * kTau;
+    agent.position = WrapPosition(agent.position + HeadingDirection(agent.heading) * movementDistance);
+    agent.progress = frac(agent.progress + 0.0009765625);
+    _Agents[agentIndex] = agent;
+
+    int2 depositPixel = WrapPixel((int2)floor(agent.position + 0.5));
+    uint previousCount;
+    InterlockedAdd(_ParticleCounters[depositPixel], 1u, previousCount);
+}
+
+[numthreads(8, 8, 1)]
+void UpdateTrail(uint2 pixel : SV_DispatchThreadID)
+{
+    if (any(pixel >= (uint2)_Resolution))
+        return;
+
+    int2 centerPixel = (int2)pixel;
+    float neighborhoodSum = 0.0;
+
+    [unroll]
+    for (int y = -1; y <= 1; y++)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; x++)
+            neighborhoodSum += _TrailRead.Load(int3(WrapPixel(centerPixel + int2(x, y)), 0));
+    }
+
+    float previousTrail = _TrailRead.Load(int3(centerPixel, 0));
+    float diffusedTrail = lerp(previousTrail, neighborhoodSum * (1.0 / 9.0), saturate(_Diffusion));
+    uint count = _ParticleCounters[pixel];
+    float limitedCount = (float)min(count, (uint)max(_DepositCountLimit, 1));
+    float deposit = sqrt(limitedCount) * _DepositStrength;
+    float nextTrail = min(max(diffusedTrail * _Decay + deposit, 0.0), _TrailValueLimit);
+
+    _TrailWrite[pixel] = nextTrail;
+    _ParticleDensity[pixel] = sqrt(limitedCount) * rsqrt((float)max(_DepositCountLimit, 1));
+}
