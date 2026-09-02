@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -7,60 +8,23 @@ using UnityEngine.Rendering;
 /// sampling domain, while the shader collapses those instances into one cube
 /// per brightness-driven quadtree leaf.
 /// </summary>
+
+[System.Serializable]
+public class TextureRow
+{
+    public List<Texture2D> textures = new List<Texture2D>();
+    
+    // Optional helper indexer for easy access: row[col]
+    public Texture2D this[int index]
+    {
+        get => textures[index];
+        set => textures[index] = value;
+    }
+}
+
 [ExecuteAlways]
 public sealed class AsciiArtQuadtree3DRenderer : ShaderController
 {
-    [System.Serializable]
-    public class Parameters
-    {
-        [Range(1, 10)] public int patternCount = 5;
-        [Range(0, 10)] public int textureCount = 4;
-        public Color patternColor = Color.black;
-        public Color patternBackgroundColor = Color.white;
-        
-        [Header("Grid")]
-        [Min(1)] public int resolution = 60;
-        [Min(0.01f)] public float gridWidth = 10f;
-        [Min(0.01f)] public float gridHeight = 5.625f;
-        [Range(0f, 0.9f)] public float cellGap = 0.06f;
-        public Color lineColor = Color.black;
-        public float lineWidth = 1.0f;
-        [Range(0f, 1f)] public float lineStrength = 1.0f;
-        public float phaseSpeed = 0.1f;
-        public float posterizeLevel = 5f;
-        [Range(0.1f, 5)] public float gamma = 1f;
-        [Range(0, 4)] public float contrast = 1f;
-        [Range(-1, 1)] public float brightness = 0f;
-        
-        public Vector3 hsvAdjust = Vector3.one;
-        [Range(0f, 1f)] public float colorTexUvIndex = 0f;
-
-        [Header("Adaptive Quadtree")]
-        [Min(1)] public int minimumShortAxisDivisions = 4;
-        [Range(1, 8)] public int maximumDepth = 6;
-        [Range(0f, 1f)] public float brightnessStop = 0.5f;
-
-        [Header("Object Depth")]
-        [Min(0.01f)] public float thickness = 0.2f;
-        [Range(-50f, 50f)] public float randomDepthOffset = 0.5f;
-
-        [Header("Geometry Motion")]
-        [Range(0f, 1f)] public float motionActiveThreshold;
-        [Min(0f)] public float depthMotionAmplitude;
-        [Min(0f)] public float depthMotionSpeed = 1f;
-        [Range(-180f, 180f)] public float rotationAmplitude;
-
-        [Header("Curl Noise Motion")]
-        public float curlNoiseAmplitude = 0.1f;
-        [Min(0f)] public float curlNoiseScale = 2f;
-        public float curlNoiseSpeed = 0.25f;
-        public Vector3 curlNoiseDirection = new Vector3(0.3f, 0.2f, 0.1f);
-
-        [Header("Patterns")]
-        public Texture2D[] textures;
-        public string textureBindName = "_Pattern";
-    }
-
     private const int MaxInstancesPerDraw = 511;
 
     private static readonly int PatternCountId = Shader.PropertyToID("_PatternCount");
@@ -97,9 +61,13 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     [SerializeField] private Camera targetCamera;
     [SerializeField] private ShadowCastingMode shadowCasting = ShadowCastingMode.On;
     [SerializeField] private bool receiveShadows = true;
-    [SerializeField] private Parameters param = new();
+    [SerializeField] private AsciiQuadtreeParam param = new();
     [SerializeField] private int randomSeed = 1337;
 
+    [Header("Patterns")]
+    [SerializeField] private List<TextureRow> texturesSet;
+    [SerializeField] private string textureBindName = "_Pattern";
+    
     private MaterialPropertyBlock _properties;
     private NativeArray<Matrix4x4>[] _instanceBatches;
     private int _columns;
@@ -113,7 +81,9 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     private float _lastRandomDepthOffset = -1f;
     private int _lastRandomSeed;
     private Matrix4x4 _lastLocalToWorld;
-
+    
+    public AsciiQuadtreeParam Param { get => param; set => param = value; }
+    
     private void OnEnable()
     {
         _properties ??= new MaterialPropertyBlock();
@@ -258,12 +228,16 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         _properties.SetFloat(BrightnessId, param.brightness);
         _properties.SetVector(HsvAdjustId, param.hsvAdjust);
 
-        if (param.textures != null)
+        if (texturesSet != null)
         {
-            for (int i = 0; i < param.textures.Length; i++)
+            var texId = param.activeTextureSetIndex;
+            if (texId < texturesSet.Count && texturesSet[texId] != null)
             {
-                if (param.textures[i])
-                    _properties.SetTexture($"{param.textureBindName}{i}", param.textures[i]);
+                for (int i = 0; i < texturesSet[texId].textures.Count; i++)
+                {
+                    if (texturesSet[texId][i])
+                        _properties.SetTexture($"{textureBindName}{i}", texturesSet[texId][i]);
+                }
             }
         }
 

@@ -3,6 +3,9 @@ Shader "Unlit/FolklorePlanetaire"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        _Size ("Size", Float) = 1
+        _Offset ("Canvas Offset (XY)", Vector) = (0, 0, 0, 0)
+        _CanvasAspect ("Canvas Aspect (W/H)", Float) = 1
         _TileCount ("Tile Count", Float) = 30
         _PatternCount("Pattern Count", Float) = 1
         _ColorLow("Color Low", Color) = (5., 0., 40.)
@@ -50,6 +53,9 @@ Shader "Unlit/FolklorePlanetaire"
             float3 _ColorMid2;
             float3 _ColorHi;
             float _TexWeight;
+            float _Size;
+            float4 _Offset;
+            float _CanvasAspect;
             
             float3 mix4ColorGradient(float ratio, float3 start, float3 mid1, float3 mid2, float3 end){
                 return
@@ -253,15 +259,18 @@ Shader "Unlit/FolklorePlanetaire"
 
             fixed4 frag (v2f i) : SV_Target
             {
-                // Normalized pixel coordinates (from 0 to 1)
-                // float2 uv = i.uv - 0.5;
-                float2 uv = (2.0 * i.vertex.xy - _ScreenParams.xy) / _ScreenParams.y;
-
-                float2 pos = float2(uv*6.0);
+                float safeSize = max(abs(_Size), 0.0001);
+                float safeAspect = max(abs(_CanvasAspect), 0.0001);
+                float2 canvasUV = i.uv - 0.5;
+                canvasUV.x *= safeAspect;
+                float2 uv = canvasUV / safeSize + _Offset.xy;
+                // // Normalized pixel coordinates (from 0 to 1)
+                // // float2 uv = i.uv - 0.5;
+                // float2 uv = (2.0 * i.vertex.xy - _ScreenParams.xy) / _ScreenParams.y;
+                // float2 pos = float2(uv*6.0);
 
                 float2 tile_coord = frac(uv*_TileCount)-.5;
                 float2 tile_idx = floor(uv*_TileCount)-.5;
-                
              
                 // Use the noise function
                 float reshape = 16.;

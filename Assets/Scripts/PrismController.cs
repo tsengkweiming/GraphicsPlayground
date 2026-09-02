@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [System.Serializable]
-public class PrismControllerParam : ShaderControllerParam<PrismControllerParam>
+public class PrismControllerParam : ParmeterController<PrismControllerParam>
 {
     [Range(0, 6)] public float patternMode;
     [Range(0, 1)] public float patternBlend;

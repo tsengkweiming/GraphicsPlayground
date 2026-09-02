@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [System.Serializable]
-public class GyroidControllerParam : ShaderControllerParam<GyroidControllerParam>
+public class GyroidControllerParam : ParmeterController<GyroidControllerParam>
 {
     [Range(0, 4)] public float patternMode;
     [Range(0, 1)] public float shapeBlend;
@@ -13,6 +13,9 @@ public class GyroidControllerParam : ShaderControllerParam<GyroidControllerParam
     [Range(0.05f, 3)] public float colorFrequency = 1;
     [Range(0, 2)] public float colorContrast = 1;
     public float moveTime = 0.25f;
+    public Vector3 offset = Vector3.zero;
+    public float aspect = 1f;
+    public float size = 1f;
 
     public override void CopyFrom(GyroidControllerParam other)
     {
@@ -31,6 +34,9 @@ public class GyroidControllerParam : ShaderControllerParam<GyroidControllerParam
         colorFrequency = other.colorFrequency;
         colorContrast = other.colorContrast;
         moveTime = other.moveTime;
+        size = other.size;
+        offset = other.offset;
+        aspect = other.aspect;
     }
 
     public override void MoveTowards(GyroidControllerParam target, float t)
@@ -50,6 +56,9 @@ public class GyroidControllerParam : ShaderControllerParam<GyroidControllerParam
         colorFrequency = LerpValue(colorFrequency, target.colorFrequency, t);
         colorContrast = LerpValue(colorContrast, target.colorContrast, t);
         moveTime = LerpValue(moveTime, target.moveTime, t);
+        size = LerpValue(size, target.size, t);
+        aspect = LerpValue(aspect, target.aspect, t);
+        offset = LerpValue(offset, target.offset, t);
     }
 
     public override bool Approximately(GyroidControllerParam other)
@@ -68,7 +77,11 @@ public class GyroidControllerParam : ShaderControllerParam<GyroidControllerParam
             && ApproximatelyValue(colorMode, other.colorMode)
             && ApproximatelyValue(colorFrequency, other.colorFrequency)
             && ApproximatelyValue(colorContrast, other.colorContrast)
-            && ApproximatelyValue(moveTime, other.moveTime);
+            && ApproximatelyValue(moveTime, other.moveTime)
+            && ApproximatelyValue(offset, other.offset)
+            && ApproximatelyValue(size, other.size)
+            && ApproximatelyValue(aspect, other.aspect)
+            ;
     }
 }
 
@@ -86,6 +99,9 @@ public class GyroidController : ShaderController
     private static readonly int ColorFrequencyId = Shader.PropertyToID("_ColorFrequency");
     private static readonly int ColorContrastId = Shader.PropertyToID("_ColorContrast");
     private static readonly int MoveTimeId = Shader.PropertyToID("_MoveTime");
+    private static readonly int OffsetId = Shader.PropertyToID("_Offset");
+    private static readonly int SizeId = Shader.PropertyToID("_Size");
+    private static readonly int CanvasAspectId = Shader.PropertyToID("_CanvasAspect");
 
     private readonly GyroidControllerParam _currentParam = new GyroidControllerParam();
     private double _lastEditorTime;
@@ -156,6 +172,9 @@ public class GyroidController : ShaderController
         _material.SetFloat(ColorFrequencyId, param.colorFrequency);
         _material.SetFloat(ColorContrastId, param.colorContrast);
         _material.SetFloat(MoveTimeId, param.moveTime);
+        _material.SetFloat(CanvasAspectId, param.aspect);
+        _material.SetFloat(SizeId, param.size);
+        _material.SetVector(OffsetId, param.offset);
     }
 
     private float GetDeltaTime()

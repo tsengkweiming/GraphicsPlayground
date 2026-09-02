@@ -37,7 +37,7 @@ public struct Text
 
 
 [System.Serializable]
-public class TextGIParam : ShaderControllerParam<TextGIParam>
+public class TextGIParam : ParmeterController<TextGIParam>
 {
     public LightType LightType = LightType.Text;
     [Range(1, 30)] public int MaxRay;

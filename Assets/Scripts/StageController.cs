@@ -12,6 +12,7 @@ public class StageData
 public class StageController : SingletonMonoBehaviour<StageController>
 {
     [SerializeField] private StageData[] stageDatas = Array.Empty<StageData>();
+    [SerializeField] private GameObject testStage;
 
     private StageData _activeStageData;
     private GameObject _activeRandomObject;
@@ -44,6 +45,11 @@ public class StageController : SingletonMonoBehaviour<StageController>
 
         _activeStageData = nextStageData;
         CurrentOscId = oscId;
+    }
+
+    public void SetTestStage(bool state)
+    {
+        testStage.SetActive(state);
     }
 
     /// <summary>

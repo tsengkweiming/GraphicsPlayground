@@ -32,12 +32,11 @@ namespace Osc
             }
             if (msg.Count > 1 && int.TryParse(msg[1], out int oscId))
             {
-                Debug.Log($"Received OscId: {oscId}");
                 StageController.Instance.SetStage(oscId);
             }
-            if (msg.Count > 2 && float.TryParse(msg[2], out float scendId))
+            if (msg.Count > 2 && int.TryParse(msg[2], out int vfxSwitch))
             {
-                Debug.Log($"Received SceneId: {scendId}");
+                StageController.Instance.SetTestStage(vfxSwitch > 0);
             }
         }
         

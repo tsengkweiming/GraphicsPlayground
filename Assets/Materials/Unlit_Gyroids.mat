@@ -29,19 +29,24 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _CanvasAspect: 5.766667
     - _ColorContrast: 1
     - _ColorFrequency: 1
     - _ColorMode: 1
     - _PatternMode: 0
     - _Scale: 4
     - _ShapeBlend: 0
+    - _Size: 1
     - _Thickness: 0.1
     - _Twist: 0
+    - _VignetteStrength: 0.628
     - _Warp: 0
     m_Colors:
+    - _Offset: {r: 0, g: 0, b: 0, a: 0}
     - _Palette_A: {r: 0.45, g: 0.45, b: 0.45, a: 1}
     - _Palette_B: {r: 0.35, g: 0.35, b: 0.35, a: 1}
     - _Palette_C: {r: 1, g: 1, b: 1, a: 1}
     - _Palette_D: {r: 0.7, g: 0.39, b: 0.2, a: 1}
+    - _WorldOffset: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

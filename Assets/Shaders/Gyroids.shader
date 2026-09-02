@@ -4,6 +4,8 @@ Shader "Unlit/Gyroids"
     {
         _MainTex ("Texture", 2D) = "white" {}
         _Size ("Size", Float) = 1
+        _Offset ("Canvas Offset (XY)", Vector) = (0, 0, 0, 0)
+        _CanvasAspect ("Canvas Aspect (W/H)", Float) = 1
         _PatternMode ("Pattern Mode", Range(0, 4)) = 0
         _ShapeBlend ("Shape Blend", Range(0, 1)) = 0.25
         _Scale ("Pattern Scale", Range(0, 12)) = 4
@@ -65,6 +67,8 @@ Shader "Unlit/Gyroids"
             float _VignetteStrength;
             float _MoveTime;
             float _Size;
+            float4 _Offset;
+            float _CanvasAspect;
             float3 _Palette_A;
             float3 _Palette_B;
             float3 _Palette_C;
@@ -210,14 +214,18 @@ Shader "Unlit/Gyroids"
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.uv = v.uv;
                 UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;
             }
 
             fixed4 frag (v2f IN) : SV_Target
             {
-                float2 uv = (IN.vertex.xy - 0.5 * _ScreenParams.xy) / _ScreenParams.y / _Size;
+                float safeSize = max(abs(_Size), 0.0001);
+                float safeAspect = max(abs(_CanvasAspect), 0.0001);
+                float2 canvasUV = IN.uv - 0.5;
+                canvasUV.x *= safeAspect;
+                float2 uv = canvasUV / safeSize + _Offset.xy;
                 float3 init = float3(_Time.y*_MoveTime,1.5,.3);
                 float3 cam = normalize(float3(1., uv ));
 

@@ -1,11 +1,13 @@
 using RosettaSetting;
 using RosettaUI;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class LightSetting : MonoBehaviour
 {
     private RosettaUIRoot root;
     private WindowElement rootWindow;
+    private UIDocument uiDocument;
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -15,7 +17,8 @@ public class LightSetting : MonoBehaviour
 
         var rootElement = CreateElement();
         root.Build(rootElement);
-        root.enabled = false;
+        rootWindow.Enable = false;
+        SetRootVisible(false);
     }
 
     Element CreateElement()
@@ -35,6 +38,20 @@ public class LightSetting : MonoBehaviour
     
     public void Toggle()
     {
-        root.enabled = !root.enabled;
+        if (rootWindow != null)
+        {
+            var visible = !rootWindow.Enable;
+            rootWindow.Enable = visible;
+            SetRootVisible(visible);
+        }
+    }
+
+    private void SetRootVisible(bool visible)
+    {
+        uiDocument ??= GetComponent<UIDocument>();
+        if (uiDocument?.rootVisualElement != null)
+        {
+            uiDocument.rootVisualElement.visible = visible;
+        }
     }
 }

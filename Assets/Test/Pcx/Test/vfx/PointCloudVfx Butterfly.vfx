@@ -66,7 +66,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d4c867f6b72b714dbb5fd1780afe208, type: 3}
-  m_Name: PointCloudVfx
+  m_Name: PointCloudVfx Butterfly
   m_EditorClassIdentifier: 
   m_UIIgnoredErrors: []
   m_Parent: {fileID: 0}
@@ -245,7 +245,7 @@ VisualEffectResource:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: PointCloudVfx
+  m_Name: PointCloudVfx Butterfly
   m_Graph: {fileID: 114350483966674976}
   m_Infos:
     m_RendererSettings:
@@ -8253,8 +8253,6 @@ MonoBehaviour:
     linkedSlots:
     - outputSlot: {fileID: 8926484042661614872}
       inputSlot: {fileID: 8926484042661614698}
-    - outputSlot: {fileID: 8926484042661614872}
-      inputSlot: {fileID: 8926484042661614845}
     position: {x: -277.33334, y: 2042.6666}
     expandedSlots: []
     expanded: 1

@@ -4,13 +4,35 @@ using UnityEngine;
 [CustomEditor(typeof(PhysarumSimulation))]
 public sealed class PhysarumSimulationEditor : Editor
 {
+    private SerializedProperty selectedPatternProperty;
+    private SerializedProperty spawnShapeProperty;
+
+    private void OnEnable()
+    {
+        selectedPatternProperty = serializedObject.FindProperty("selectedPattern");
+        spawnShapeProperty = serializedObject.FindProperty("spawnShape");
+    }
+
     public override void OnInspectorGUI()
     {
-        DrawDefaultInspector();
+        serializedObject.Update();
+
+        EditorGUILayout.LabelField("Pattern Controls", EditorStyles.boldLabel);
+        DrawEnumSlider<PhysarumSimulation.Pattern>(selectedPatternProperty, "Pattern");
+        DrawEnumSlider<PhysarumSimulation.SpawnShape>(spawnShapeProperty, "Spawn Shape");
+        EditorGUILayout.Space();
+
+        DrawPropertiesExcluding(
+            serializedObject,
+            "m_Script",
+            "selectedPattern",
+            "spawnShape");
+
+        serializedObject.ApplyModifiedProperties();
         EditorGUILayout.Space();
 
         var simulation = (PhysarumSimulation)target;
-        if (GUILayout.Button("Apply Selected Pattern"))
+        if (GUILayout.Button("Reapply Current Pattern"))
         {
             Undo.RecordObject(simulation, "Apply Physarum Pattern");
             simulation.ApplySelectedPreset();
@@ -27,8 +49,24 @@ public sealed class PhysarumSimulationEditor : Editor
         }
 
         EditorGUILayout.HelpBox(
-            "Changing resolution or agent count rebuilds GPU resources. Most other values can be tuned live without resetting.",
+            "Pattern selection applies automatically. Spawn-shape changes reset agents automatically. Resolution or agent-count changes rebuild GPU resources; most other values tune live.",
             MessageType.Info);
+    }
+
+    private static void DrawEnumSlider<TEnum>(SerializedProperty property, string label)
+        where TEnum : System.Enum
+    {
+        string[] names = System.Enum.GetNames(typeof(TEnum));
+        int maximum = Mathf.Max(0, names.Length - 1);
+        int current = Mathf.Clamp(property.enumValueIndex, 0, maximum);
+
+        EditorGUI.BeginChangeCheck();
+        int selected = EditorGUILayout.IntSlider(label, current, 0, maximum);
+        if (EditorGUI.EndChangeCheck())
+            property.enumValueIndex = selected;
+
+        using (new EditorGUI.IndentLevelScope())
+            EditorGUILayout.LabelField("Selected", ObjectNames.NicifyVariableName(names[selected]));
     }
 
     [MenuItem("GameObject/Graphics Playground/Physarum Simulation", false, 10)]

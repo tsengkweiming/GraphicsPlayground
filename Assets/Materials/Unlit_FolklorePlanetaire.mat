@@ -24,11 +24,22 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 24d88378430f24348b3d57648b70273b, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
-    m_Floats: []
-    m_Colors: []
+    m_Floats:
+    - _CanvasAspect: 5.766667
+    - _PatternCount: 4
+    - _SampleTex: 0
+    - _Size: 0.3
+    - _TexWeight: 0.263
+    - _TileCount: 8
+    m_Colors:
+    - _ColorHi: {r: 0.68388736, g: 0.74901944, b: 0, a: 1}
+    - _ColorLow: {r: 0.09362746, g: 0, b: 0.7490197, a: 1}
+    - _ColorMid1: {r: 0.18725489, g: 0.3137255, b: 0.297, a: 1}
+    - _ColorMid2: {r: 0.74902004, g: 0.078431375, b: 0.23529412, a: 1}
+    - _Offset: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

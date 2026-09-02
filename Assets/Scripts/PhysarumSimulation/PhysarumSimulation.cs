@@ -56,16 +56,18 @@ public sealed class PhysarumSimulation : MonoBehaviour
     [SerializeField] private ComputeShader simulationCompute;
     [SerializeField] private Shader displayShader;
 
-    [Header("Simulation")]
     [SerializeField] private Pattern selectedPattern = Pattern.OrganicVeins;
+    [SerializeField, HideInInspector] private Pattern appliedPattern = Pattern.OrganicVeins;
+    [Header("Simulation")]
     [SerializeField] private Vector2Int resolution = new Vector2Int(1024, 1024);
     [Min(1024)] [SerializeField] private int agentCount = 262144;
     [Range(1, 8)] [SerializeField] private int iterationsPerFrame = 2;
     [Min(0)] [SerializeField] private int seed = 1337;
     [SerializeField] private bool paused;
 
-    [Header("Initial Distribution")]
     [SerializeField] private SpawnShape spawnShape = SpawnShape.Disc;
+    [SerializeField, HideInInspector] private SpawnShape initializedSpawnShape = SpawnShape.Disc;
+    [Header("Initial Distribution")]
     [SerializeField] private Vector2 spawnCenter = new Vector2(0.5f, 0.5f);
     [Range(0.01f, 1f)] [SerializeField] private float spawnRadius = 0.82f;
     [Range(0.001f, 0.5f)] [SerializeField] private float spawnThickness = 0.08f;
@@ -249,6 +251,21 @@ public sealed class PhysarumSimulation : MonoBehaviour
         {
             ReleaseResources();
         }
+
+        // Inspector enum changes should be direct manipulation: choosing a
+        // pattern applies its parameter set, and choosing a spawn shape marks
+        // the agent state for initialization on the next simulation frame.
+        if (selectedPattern != appliedPattern)
+        {
+            ApplyPreset(selectedPattern);
+            return;
+        }
+
+        if (spawnShape != initializedSpawnShape)
+        {
+            initializedSpawnShape = spawnShape;
+            needsReset = true;
+        }
     }
 
     public void ResetSimulation()
@@ -277,6 +294,7 @@ public sealed class PhysarumSimulation : MonoBehaviour
             1);
 
         iteration = 0;
+        initializedSpawnShape = spawnShape;
         needsReset = false;
         UpdateDisplayMaterial();
     }
@@ -420,8 +438,9 @@ public sealed class PhysarumSimulation : MonoBehaviour
                 break;
         }
 
-        if (Application.isPlaying)
-            ResetSimulation();
+        appliedPattern = selectedPattern;
+        initializedSpawnShape = spawnShape;
+        needsReset = true;
     }
 
     public void SetPaused(bool value) => paused = value;

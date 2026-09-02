@@ -84,7 +84,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39321fcff7b596c4796f2a16f9193343, type: 3}
   m_Name: OctreeGridEffect
   m_EditorClassIdentifier: 
-  active: 1
+  active: 0
   factor:
     m_OverrideState: 1
     m_Value: 0
@@ -272,13 +272,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6dca5cd9fcabf5340b4671c54e37ecb1, type: 3}
   m_Name: TemporalDiffusion
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   enableEffect:
     m_OverrideState: 1
     m_Value: 1
   intensity:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0.216
   feedback:
     m_OverrideState: 1
     m_Value: 0.91
@@ -287,7 +287,7 @@ MonoBehaviour:
     m_Value: 1
   diffusionRadius:
     m_OverrideState: 1
-    m_Value: 1.25
+    m_Value: 3.13
   diffusionRate:
     m_OverrideState: 1
     m_Value: 0.18
