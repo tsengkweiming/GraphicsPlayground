@@ -18,7 +18,7 @@ public class RandomGameObjectActivator : MonoBehaviour
 {
     [SerializeField] private GameObject[] targetObjects;
 
-    [Min(0.01f)]
+    [Tooltip("Time between selections. A negative value disables automatic retriggering.")]
     [SerializeField] private float intervalSeconds = 1f;
 
     [Min(0)]
@@ -38,6 +38,7 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private float _nextTriggerTime;
     private bool _hasAppliedSelection;
+    private bool _isTriggerScheduled;
 
     private void Start()
     {
@@ -47,6 +48,19 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private void Update()
     {
+        if (intervalSeconds < 0f)
+        {
+            _isTriggerScheduled = false;
+            return;
+        }
+
+        // Allows changing the interval from negative to positive at runtime.
+        if (!_isTriggerScheduled)
+        {
+            ScheduleNextTrigger();
+            return;
+        }
+
         if (Time.time < _nextTriggerTime)
             return;
 
@@ -79,9 +93,9 @@ public class RandomGameObjectActivator : MonoBehaviour
         for (int i = _activeObjects.Count - 1; i >= 0; i--)
         {
             GameObject activeObject = _activeObjects[i];
-            if (activeObject == null || !_nextActiveLookup.Contains(activeObject))
+            if (!activeObject || !_nextActiveLookup.Contains(activeObject))
             {
-                if (activeObject != null)
+                if (activeObject)
                     DisableObject(activeObject);
 
                 _activeObjects.RemoveAt(i);
@@ -113,7 +127,7 @@ public class RandomGameObjectActivator : MonoBehaviour
         for (int i = 0; i < targetObjects.Length; i++)
         {
             GameObject targetObject = targetObjects[i];
-            if (targetObject != null && !_validObjects.Contains(targetObject))
+            if (targetObject && !_validObjects.Contains(targetObject))
                 _validObjects.Add(targetObject);
         }
     }
@@ -127,9 +141,7 @@ public class RandomGameObjectActivator : MonoBehaviour
         for (int i = 0; i < selectionCount; i++)
         {
             int randomIndex = Random.Range(i, _validObjects.Count);
-            GameObject swappedObject = _validObjects[i];
-            _validObjects[i] = _validObjects[randomIndex];
-            _validObjects[randomIndex] = swappedObject;
+            (_validObjects[i], _validObjects[randomIndex]) = (_validObjects[randomIndex], _validObjects[i]);
 
             GameObject selectedObject = _validObjects[i];
             _nextActiveObjects.Add(selectedObject);
@@ -139,6 +151,13 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private void ScheduleNextTrigger()
     {
+        if (intervalSeconds < 0f)
+        {
+            _isTriggerScheduled = false;
+            return;
+        }
+
+        _isTriggerScheduled = true;
         _nextTriggerTime = Time.time + Mathf.Max(0.01f, intervalSeconds);
     }
 
@@ -189,7 +208,7 @@ public class RandomGameObjectActivator : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < duration)
         {
-            if (targetObject == null)
+            if (!targetObject)
                 yield break;
 
             float normalizedTime = Mathf.Clamp01(elapsed / Mathf.Max(duration, 0.0001f));
@@ -200,7 +219,7 @@ public class RandomGameObjectActivator : MonoBehaviour
             yield return null;
         }
 
-        if (targetObject != null)
+        if (targetObject)
             targetObject.transform.localScale = targetScale;
 
         _scaleCoroutines.Remove(targetObject);
@@ -225,7 +244,6 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private void OnValidate()
     {
-        intervalSeconds = Mathf.Max(0.01f, intervalSeconds);
         randomCount = Mathf.Max(0, randomCount);
         activationDuration = Mathf.Max(0f, activationDuration);
     }

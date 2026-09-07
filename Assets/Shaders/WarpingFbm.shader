@@ -2,7 +2,8 @@ Shader "Unlit/WarpingFbm"
 {
     Properties
     {
-        // Based on https://www.shadertoy.com/view/lsl3RH
+        // Faithful conversion of:
+        // https://www.shadertoy.com/view/lsl3RH
         _MainTex ("Texture", 2D) = "white" {}
         _Size ("Size", Float) = 1
         _Offset ("Canvas Offset (XY)", Vector) = (0, 0, 0, 0)
@@ -21,7 +22,7 @@ Shader "Unlit/WarpingFbm"
 
         Pass
         {
-            Name "FBM"
+            Name "WarpingFbm"
             Tags { "LightMode" = "UniversalForward" }
 
             HLSLPROGRAM
@@ -30,8 +31,6 @@ Shader "Unlit/WarpingFbm"
             #pragma fragment Frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-            #define CODEX_TWO_PI 6.28318530718
 
             struct Attributes
             {
@@ -61,12 +60,14 @@ Shader "Unlit/WarpingFbm"
                 return output;
             }
 
-            // IQ's original rotation matrix:
-            // mat2 m = mat2(0.80, 0.60, -0.60, 0.80)
-            float2 RotateFBM(float2 p)
+            // GLSL:
+            // const mat2 m = mat2(0.80, 0.60, -0.60, 0.80);
+            // GLSL mat2 constructors are column-major, so this is the equivalent
+            // HLSL vector multiplication.
+            float2 RotateFbm(float2 p)
             {
-                return float2(0.80 * p.x + 0.60 * p.y,
-                    -0.60 * p.x + 0.80 * p.y);
+                return float2(0.80 * p.x - 0.60 * p.y,
+                    0.60 * p.x + 0.80 * p.y);
             }
 
             float Noise(float2 p)
@@ -74,60 +75,61 @@ Shader "Unlit/WarpingFbm"
                 return sin(p.x) * sin(p.y);
             }
 
-            float FBM4(float2 p)
+            float Fbm4(float2 p)
             {
                 float f = 0.0;
                 f += 0.5000 * Noise(p);
-                p = RotateFBM(p) * 2.02;
+                p = RotateFbm(p) * 2.02;
                 f += 0.2500 * Noise(p);
-                p = RotateFBM(p) * 2.03;
+                p = RotateFbm(p) * 2.03;
                 f += 0.1250 * Noise(p);
-                p = RotateFBM(p) * 2.01;
+                p = RotateFbm(p) * 2.01;
                 f += 0.0625 * Noise(p);
                 return f / 0.9375;
             }
 
-            float FBM6(float2 p)
+            float Fbm6(float2 p)
             {
                 float f = 0.0;
                 f += 0.500000 * (0.5 + 0.5 * Noise(p));
-                p = RotateFBM(p) * 2.02;
+                p = RotateFbm(p) * 2.02;
                 f += 0.250000 * (0.5 + 0.5 * Noise(p));
-                p = RotateFBM(p) * 2.03;
+                p = RotateFbm(p) * 2.03;
                 f += 0.125000 * (0.5 + 0.5 * Noise(p));
-                p = RotateFBM(p) * 2.01;
+                p = RotateFbm(p) * 2.01;
                 f += 0.062500 * (0.5 + 0.5 * Noise(p));
-                p = RotateFBM(p) * 2.04;
+                p = RotateFbm(p) * 2.04;
                 f += 0.031250 * (0.5 + 0.5 * Noise(p));
-                p = RotateFBM(p) * 2.01;
+                p = RotateFbm(p) * 2.01;
                 f += 0.015625 * (0.5 + 0.5 * Noise(p));
                 return f / 0.96875;
             }
 
-            float2 FBM4_2(float2 p)
+            float2 Fbm4_2(float2 p)
             {
-                return float2(FBM4(p), FBM4(p + float2(7.8, 7.8)));
+                return float2(Fbm4(p), Fbm4(p + float2(7.8, 7.8)));
             }
 
-            float2 FBM6_2(float2 p)
+            float2 Fbm6_2(float2 p)
             {
-                return float2(FBM6(p + float2(16.8, 16.8)),
-                    FBM6(p + float2(11.5, 11.5)));
+                return float2(Fbm6(p + float2(16.8, 16.8)),
+                    Fbm6(p + float2(11.5, 11.5)));
             }
 
-            // Equivalent to the Shadertoy func(q, out ron).
+            // Equivalent to:
+            // float func(vec2 q, out vec4 ron)
             float WarpedField(float2 q, float time, out float4 ron)
             {
                 q += 0.03 * sin(float2(0.27, 0.23) * time +
                     length(q) * float2(4.1, 4.3));
 
-                float2 o = FBM4_2(0.9 * q);
+                float2 o = Fbm4_2(0.9 * q);
                 o += 0.04 * sin(float2(0.12, 0.14) * time + length(o));
 
-                float2 n = FBM6_2(3.0 * o);
+                float2 n = Fbm6_2(3.0 * o);
                 ron = float4(o, n);
 
-                float f = 0.5 + 0.5 * FBM4(1.8 * q + 6.0 * n);
+                float f = 0.5 + 0.5 * Fbm4(1.8 * q + 6.0 * n);
                 return lerp(f, f * f * f * 3.5, f * abs(n.x));
             }
 
@@ -137,7 +139,7 @@ Shader "Unlit/WarpingFbm"
                 float safeAspect = max(abs(_CanvasAspect), 0.0001);
 
                 // Shadertoy:
-                // p = (2.0 * fragCoord - iResolution.xy) / iResolution.y
+                // vec2 p = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
                 float2 p = (input.uv * 2.0 - 1.0) * float2(safeAspect, 1.0);
                 p = p / safeSize + _Offset.xy;
 
@@ -154,8 +156,7 @@ Shader "Unlit/WarpingFbm"
                     0.5 * smoothstep(1.2, 1.3, abs(on.z) + abs(on.w)));
                 color = saturate(color * f * 2.0);
 
-                // Manual derivatives from the original shader. This is slower than
-                // ddx/ddy but remains stable on meshes and matches Shadertoy's path.
+                // The original uses manual derivatives for better quality.
                 float4 derivativeData;
                 float fieldX = WarpedField(p + float2(epsilon, 0.0), time, derivativeData) - f;
                 float fieldY = WarpedField(p + float2(0.0, epsilon), time, derivativeData) - f;

@@ -18,6 +18,8 @@ namespace VJ.CameraMovement
         [Range(0,1.0f)] public float angle = 0.5f;
         public float angleMin = -Mathf.PI * 0.25f;
         public float angleMax = Mathf.PI * 0.25f;
+        public bool lookAtTarget = true;
+        public bool polarDirection;
     }
     public class CameraController : MonoBehaviour, IKontrollable, MIDIUser {
 
@@ -25,9 +27,7 @@ namespace VJ.CameraMovement
         [SerializeField] protected CameraTarget target;
         [SerializeField] protected PolarCoordinate polar;
         [SerializeField] protected CameraControllerParam param;
-        [SerializeField] protected Vector3 offset;
-        [SerializeField] protected bool polarDirection;
-        
+
         protected float _distance, _angle;
 
         public CameraControllerParam Param { get => param; set => param = value; }
@@ -39,7 +39,7 @@ namespace VJ.CameraMovement
         
         void Update () {
             var dt = Time.deltaTime;
-            var dtt = dt * param.speed * (polarDirection ? 1f : -1f);
+            var dtt = dt * param.speed * (param.polarDirection ? 1f : -1f);
             polar.Horizontal(dtt);
             Apply(1f);
 
@@ -49,7 +49,10 @@ namespace VJ.CameraMovement
 
         private void Apply(float dt)
         {
-            var ct = polar.Cartesian(target.Distance + Mathf.Lerp(param.distanceMin, param.distanceMax, _distance), Mathf.Lerp(param.angleMin, param.angleMax, _angle));
+            var ct = polar.Cartesian(
+                target.Distance + Mathf.Lerp(param.distanceMin, param.distanceMax, _distance),
+                Mathf.Lerp(param.angleMin, param.angleMax, _angle));
+
             var to = ct + target.transform.position + param.offset;
             transform.position = Vector3.Lerp(transform.position, to, dt);
             Look();
@@ -57,13 +60,14 @@ namespace VJ.CameraMovement
 
         protected void Look()
         {
-            transform.LookAt(target.transform.position);
+            if (param.lookAtTarget)
+                transform.LookAt(target.transform.position);
         }
 
         public void Randomize()
         {
             param.speed = Mathf.Lerp(param.speedMin, param.speedMax, Random.value);
-            polarDirection = !polarDirection;
+            param.polarDirection = !param.polarDirection;
             polar.Move(Random.Range(0f, Mathf.PI * 0.5f), Random.Range(0f, Mathf.PI * 2f));
         }
 

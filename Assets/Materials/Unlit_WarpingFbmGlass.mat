@@ -7,13 +7,13 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Unlit_Microtorus
-  m_Shader: {fileID: 4800000, guid: ba322d68417a29a4e8a8447b6c041f09, type: 3}
+  m_Name: Unlit_WarpingFbmGlass
+  m_Shader: {fileID: 4800000, guid: e44836c39ed8440f9701ae83197a8bd6, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords:
-  - Direction Switch
+  - _USEPROCEDURALFBM_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -30,12 +30,27 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _CanvasAspect: 3.46
-    - _DirSwitch: 1
-    - _Size: 0.41
+    - _Aberration: 0.15
+    - _Absorption: 0
+    - _CameraFov: 45
+    - _CanvasAspect: 1
+    - _Exposure: 1
+    - _GlassPosition: 1
+    - _GlassRoughness: 0
+    - _GlassThickness: 0.03
+    - _IOR: 1.45
+    - _NoiseScale: 1
+    - _NoiseSmoothness: 0.4
+    - _NoiseStrength: 0.35
+    - _NoiseType: 0
+    - _Samples: 1
+    - _Size: 1
+    - _TimeScale: 1
+    - _UseProceduralFbm: 1
     m_Colors:
+    - _CameraPos: {r: 0, g: 0, b: 2.5, a: 0}
+    - _CameraTarget: {r: 0, g: 0, b: 0, a: 0}
+    - _GlassTint: {r: 1, g: 1, b: 1, a: 1}
     - _Offset: {r: 0, g: 0, b: 0, a: 0}
-    - _SwipeOffset: {r: 0, g: 0, b: 0, a: 0}
-    - _SwipeWarp: {r: 1, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
