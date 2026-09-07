@@ -73,6 +73,7 @@ Shader "GraphicsPlayground/Procedural/Torus Trail"
                 float _PaletteTrailPhase;
                 float3 _OffsetPosition;
                 float4x4 _LocalToWorld;
+                float4x4 _WorldToLocal;
             CBUFFER_END
 
             struct Attributes
@@ -97,12 +98,13 @@ Shader "GraphicsPlayground/Procedural/Torus Trail"
                 uint localIndex = _IndexBuffer[input.vertexID];
                 uint bufferIndex = localIndex + input.instanceID * _VerticesPerTrail;
                 VertexData vertex = _VertexBuffer[bufferIndex];
-                vertex.position = mul(_LocalToWorld, float4(vertex.position, 1.0)).xyz;
-                
-                VertexPositionInputs positionInputs = GetVertexPositionInputs(vertex.position);
-                output.positionCS = positionInputs.positionCS;
-                output.positionWS = positionInputs.positionWS;
-                output.normalWS = TransformObjectToWorldNormal(vertex.normal);
+                float3 positionWS = mul(_LocalToWorld, float4(vertex.position, 1.0)).xyz;
+
+                // Buffer positions are transformed explicitly, so do not pass
+                // world space back through an object-to-world helper.
+                output.positionCS = TransformWorldToHClip(positionWS);
+                output.positionWS = positionWS;
+                output.normalWS = SafeNormalize(mul(vertex.normal, (float3x3)_WorldToLocal));
                 output.trailT = vertex.uv.x;
                 output.pulsePhase = input.instanceID * _PulseTrailPhase + vertex.uv.x * _PulseSegmentPhase;
 

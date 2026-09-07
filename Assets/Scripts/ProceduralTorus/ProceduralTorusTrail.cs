@@ -67,6 +67,9 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     [Min(0f)] [SerializeField] private float pulsePhasePerTrail = 0.002f;
     [Range(0f, 1f)] [SerializeField] private float pulseDarkBrightness = 0.15f;
 
+    [Header("Rendering")]
+    [Min(1f)] [SerializeField] private float boundsPadding = 2f;
+
     private static readonly int InitialPositionBufferId = Shader.PropertyToID("_InitialPositionBuffer");
     private static readonly int SegmentBufferId = Shader.PropertyToID("_SegmentBuffer");
     private static readonly int VertexBufferId = Shader.PropertyToID("_VertexBuffer");
@@ -97,6 +100,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     private static readonly int TrailCountId = Shader.PropertyToID("_TrailCount");
     private static readonly int TotalVertexCountId = Shader.PropertyToID("_TotalVertexCount");
     private static readonly int LocalToWorldId = Shader.PropertyToID("_LocalToWorld");
+    private static readonly int WorldToLocalId = Shader.PropertyToID("_WorldToLocal");
 
     private const int ComputeThreadGroupSize = 64;
 
@@ -142,10 +146,11 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         AnimateSegments();
         ReconstructFrames();
         TessellateVertices();
+        SubmitRender();
         noiseOffset += noiseMotion * Mathf.Min(Time.deltaTime, 1f / 30f);
     }
 
-    private void OnRenderObject()
+    private void SubmitRender()
     {
         if (!initialized || _trailMaterial == null || vertexBuffer == null)
             return;
@@ -158,13 +163,42 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         _trailMaterial.SetInt(VerticesPerTrailId, VerticesPerTrail);
         _trailMaterial.SetInt(PaletteSizeId, paletteResolution);
 
-        if (_trailMaterial.SetPass(0))
+        // Submit the draw to Unity's render loop so URP schedules it with the
+        // opaque queue and binds the camera's depth attachment. DrawProceduralNow
+        // from OnRenderObject would instead draw immediately against whichever
+        // render target happens to be active at that point.
+        RenderParams renderParams = new RenderParams(_trailMaterial)
         {
-            Graphics.DrawProceduralNow(
-                MeshTopology.Triangles,
-                indices.Length,
-                trailCount);
-        }
+            layer = gameObject.layer,
+            worldBounds = CalculateWorldBounds(),
+            shadowCastingMode = ShadowCastingMode.Off,
+            receiveShadows = false
+        };
+
+        Graphics.RenderPrimitives(
+            renderParams,
+            MeshTopology.Triangles,
+            indices.Length,
+            trailCount);
+    }
+
+    private Bounds CalculateWorldBounds()
+    {
+        // The centerline advances by centerlineStep for every segment. Padding
+        // leaves room for noise-gradient magnitudes greater than one.
+        float localRadius = (
+            initialSpread +
+            centerlineStep * segmentsPerTrail +
+            tubeRadius) * boundsPadding;
+
+        Vector3 scale = transform.lossyScale;
+        float maximumScale = Mathf.Max(
+            Mathf.Abs(scale.x),
+            Mathf.Abs(scale.y),
+            Mathf.Abs(scale.z));
+
+        float worldRadius = Mathf.Max(localRadius * maximumScale, 0.001f);
+        return new Bounds(transform.position, Vector3.one * (worldRadius * 2f));
     }
 
     private void OnDisable()
@@ -186,6 +220,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         visibleLength = Mathf.Clamp01(visibleLength);
         centerlineNoiseScale = Mathf.Max(0.0001f, centerlineNoiseScale);
         centerlineStep = Mathf.Max(0f, centerlineStep);
+        boundsPadding = Mathf.Max(1f, boundsPadding);
 
         if (Application.isPlaying)
             buffersDirty = true;
@@ -390,6 +425,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         _trailMaterial.SetFloat(PaletteSegmentPhaseId, paletteSegmentPhase);
         _trailMaterial.SetFloat(PaletteTrailPhaseId, paletteTrailPhase);
         _trailMaterial.SetMatrix(LocalToWorldId, transform.localToWorldMatrix);
+        _trailMaterial.SetMatrix(WorldToLocalId, transform.worldToLocalMatrix);
     }
 
     private void EnsureGradients()
