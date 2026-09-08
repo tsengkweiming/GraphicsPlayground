@@ -25,6 +25,10 @@ public class TextureRow
 [ExecuteAlways]
 public sealed class AsciiArtQuadtree3DRenderer : ShaderController
 {
+    // A Matrix4x4 instance uploads both object-to-world and world-to-object
+    // data in Unity's instancing buffer. Keep the same safe 511-instance
+    // limit used by the non-quadtree 3D renderer. The actual batch size is
+    // calculated from the current column count below.
     private const int MaxInstancesPerDraw = 511;
 
     private static readonly int PatternCountId = Shader.PropertyToID("_PatternCount");
@@ -35,6 +39,9 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     private static readonly int GridRowsId = Shader.PropertyToID("_GridRows");
     private static readonly int GridAspectId = Shader.PropertyToID("_GridAspect");
     private static readonly int InstanceBaseIndexId = Shader.PropertyToID("_InstanceBaseIndex");
+    private static readonly int QuadTreeLeavesId = Shader.PropertyToID("_QuadTreeLeaves");
+    private static readonly int MainTexId = Shader.PropertyToID("_MainTex");
+    private static readonly int FlipYId = Shader.PropertyToID("_FlipY");
     private static readonly int MotionActiveThresholdId = Shader.PropertyToID("_MotionActiveThreshold");
     private static readonly int DepthMotionAmplitudeId = Shader.PropertyToID("_DepthMotionAmplitude");
     private static readonly int DepthMotionSpeedId = Shader.PropertyToID("_DepthMotionSpeed");
@@ -63,6 +70,7 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     [SerializeField] private bool receiveShadows = true;
     [SerializeField] private AsciiQuadtreeParam param = new();
     [SerializeField] private int randomSeed = 1337;
+    [SerializeField] private ComputeShader quadtreeCompute;
 
     [Header("Patterns")]
     [SerializeField] private List<TextureRow> texturesSet;
@@ -70,6 +78,8 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     
     private MaterialPropertyBlock _properties;
     private NativeArray<Matrix4x4>[] _instanceBatches;
+    private GraphicsBuffer _quadTreeLeaves;
+    private int _quadTreeKernel = -1;
     private int _columns;
     private int _rows;
     private int _instanceCount;
@@ -81,6 +91,8 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     private float _lastRandomDepthOffset = -1f;
     private int _lastRandomSeed;
     private Matrix4x4 _lastLocalToWorld;
+
+    private const int QuadTreeLeafStride = sizeof(float) * 8;
     
     public AsciiQuadtreeParam Param { get => param; set => param = value; }
     
@@ -92,17 +104,29 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
             _material.enableInstancing = true;
 
         mesh ??= Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        quadtreeCompute ??= Resources.Load<ComputeShader>("AsciiArtQuadtree3D");
+        if (quadtreeCompute != null)
+            _quadTreeKernel = quadtreeCompute.FindKernel("EvaluateQuadtree");
         RebuildIfNeeded(true);
     }
 
     private void OnDisable()
     {
         DisposeInstanceBatches();
+        DisposeQuadTreeBuffer();
+    }
+
+    protected override void OnDestroy()
+    {
+        DisposeInstanceBatches();
+        DisposeQuadTreeBuffer();
+        base.OnDestroy();
     }
 
     private void LateUpdate()
     {
         RebuildIfNeeded(false);
+        EvaluateQuadTree();
         DrawInstances();
     }
 
@@ -132,8 +156,9 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
 
         _columns = safeResolution;
         float aspect = gridSize.x / gridSize.y;
-        _rows = Mathf.Max(1, Mathf.FloorToInt(_columns / Mathf.Max(aspect, 0.0001f)));
+        _rows = Mathf.Max(1, Mathf.RoundToInt(_columns / Mathf.Max(aspect, 0.0001f)));
         _instanceCount = _columns * _rows;
+        EnsureQuadTreeBuffer(_instanceCount);
 
         int rowsPerBatch = _columns <= MaxInstancesPerDraw
             ? Mathf.Max(1, MaxInstancesPerDraw / _columns)
@@ -193,9 +218,47 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         _lastLocalToWorld = localToWorld;
     }
 
+    private void EnsureQuadTreeBuffer(int count)
+    {
+        if (quadtreeCompute == null || count <= 0)
+            return;
+
+        if (_quadTreeLeaves != null && _quadTreeLeaves.count == count)
+            return;
+
+        DisposeQuadTreeBuffer();
+        _quadTreeLeaves = new GraphicsBuffer(
+            GraphicsBuffer.Target.Structured,
+            count,
+            QuadTreeLeafStride);
+    }
+
+    private void EvaluateQuadTree()
+    {
+        if (quadtreeCompute == null || _quadTreeKernel < 0 || _quadTreeLeaves == null)
+            return;
+
+        Texture sourceTexture = _material.GetTexture(MainTexId) ?? Texture2D.whiteTexture;
+        quadtreeCompute.SetTexture(_quadTreeKernel, MainTexId, sourceTexture);
+        quadtreeCompute.SetBuffer(_quadTreeKernel, QuadTreeLeavesId, _quadTreeLeaves);
+        quadtreeCompute.SetInt(GridColumnsId, _columns);
+        quadtreeCompute.SetInt(GridRowsId, _rows);
+        quadtreeCompute.SetFloat(GridAspectId, (float)_columns / Mathf.Max(_rows, 1));
+        quadtreeCompute.SetFloat(QuadTreeMinDivisionsId, param.minimumShortAxisDivisions);
+        quadtreeCompute.SetFloat(QuadTreeMaxIterationsId, param.maximumDepth);
+        quadtreeCompute.SetFloat(QuadTreeThresholdId, Mathf.Clamp01(param.brightnessStop));
+        quadtreeCompute.SetFloat(FlipYId, _material.GetFloat(FlipYId));
+
+        quadtreeCompute.Dispatch(
+            _quadTreeKernel,
+            Mathf.CeilToInt(_columns / 8f),
+            Mathf.CeilToInt(_rows / 8f),
+            1);
+    }
+
     private void DrawInstances()
     {
-        if (!_material || !mesh || _instanceBatches == null || param == null)
+        if (!_material || !mesh || _instanceBatches == null || _quadTreeLeaves == null || param == null)
             return;
 
         _properties.Clear();
@@ -205,7 +268,11 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         _properties.SetColor(PatternBackgroundColorId, param.patternBackgroundColor);
         _properties.SetFloat(GridColumnsId, _columns);
         _properties.SetFloat(GridRowsId, _rows);
-        _properties.SetFloat(GridAspectId, param.gridWidth / Mathf.Max(param.gridHeight, 0.0001f));
+        _properties.SetBuffer(QuadTreeLeavesId, _quadTreeLeaves);
+        // Use the actual integer lattice aspect. The requested world-size
+        // aspect can differ slightly after rows are rounded to an integer,
+        // which otherwise makes quadtree boundaries drift against the cells.
+        _properties.SetFloat(GridAspectId, (float)_columns / Mathf.Max(_rows, 1));
         _properties.SetInt(QuadTreeMinDivisionsId, param.minimumShortAxisDivisions);
         _properties.SetInt(QuadTreeMaxIterationsId, param.maximumDepth);
         _properties.SetFloat(QuadTreeThresholdId, Mathf.Clamp01(param.brightnessStop));
@@ -293,6 +360,12 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         }
 
         _instanceBatches = null;
+    }
+
+    private void DisposeQuadTreeBuffer()
+    {
+        _quadTreeLeaves?.Release();
+        _quadTreeLeaves = null;
     }
 
     private static float Hash01(int value, int seed)

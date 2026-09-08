@@ -96,6 +96,17 @@ struct BrightnessQuadResult
     int depth;
 };
 
+// Packed result written by the compute evaluator and read by the instanced
+// renderer. Keep this layout in sync with the C# GraphicsBuffer stride.
+struct QuadTreeLeafData
+{
+    float2 center;
+    float2 size;
+    float2 cellCenter;
+    float brightness;
+    float keep;
+};
+
 // Finds the leaf containing position using luminance as the stop condition.
 // Bright nodes stop at their current size; dark nodes keep dividing until they
 // become bright enough or the requested maximum depth is reached.
@@ -217,6 +228,87 @@ BrightnessQuadResult FindBrightnessQuadTreeLod(
         quadSize *= 0.5;
     }
 
+    return result;
+}
+
+float2 QuadTreeSourceUv(float2 uv, float flipY)
+{
+    uv.y = lerp(uv.y, 1.0 - uv.y, step(0.5, flipY));
+    return uv;
+}
+
+float2 QuadTreeMinimumDivisions(float gridAspect, float minimumShortAxisDivisions)
+{
+    float shortAxis = max(floor(minimumShortAxisDivisions), 1.0);
+    float safeAspect = max(gridAspect, 0.0001);
+    float2 landscape = float2(
+        max(round(shortAxis * safeAspect), 1.0),
+        shortAxis);
+    float2 portrait = float2(
+        shortAxis,
+        max(round(shortAxis / safeAspect), 1.0));
+    return lerp(portrait, landscape, step(1.0, safeAspect));
+}
+
+int QuadTreeMaximumIterations(
+    float2 gridSize,
+    float2 minimumDivisions,
+    float requestedIterations)
+{
+    // Each iteration doubles both axes. Stop before a leaf can become smaller
+    // than the discrete evaluation lattice, which avoids duplicate or empty
+    // representative cells at non-power-of-two resolutions.
+    float ratioX = max(gridSize.x / max(minimumDivisions.x, 1.0), 1.0);
+    float ratioY = max(gridSize.y / max(minimumDivisions.y, 1.0), 1.0);
+    float ratio = max(min(ratioX, ratioY), 1.0);
+    int resolutionDepth = 1 + (int)floor(log2(ratio));
+    int safeRequested = (int)floor(max(requestedIterations, 1.0));
+    return min(safeRequested, resolutionDepth);
+}
+
+QuadTreeLeafData EvaluateQuadTreeCell(
+    Texture2D sourceTexture,
+    SamplerState sourceSampler,
+    uint globalIndex,
+    uint columns,
+    uint rows,
+    float gridAspect,
+    float minimumShortAxisDivisions,
+    float requestedIterations,
+    float stopBrightness,
+    float flipY)
+{
+    QuadTreeLeafData result;
+    uint safeColumns = max(columns, 1u);
+    uint safeRows = max(rows, 1u);
+    float2 gridSize = float2(safeColumns, safeRows);
+    uint2 cellId = uint2(globalIndex % safeColumns, globalIndex / safeColumns);
+    result.cellCenter = (float2(cellId) + 0.5) / gridSize;
+
+    float2 minimumDivisions = QuadTreeMinimumDivisions(
+        gridAspect,
+        minimumShortAxisDivisions);
+    int maximumIterations = QuadTreeMaximumIterations(
+        gridSize,
+        minimumDivisions,
+        requestedIterations);
+
+    BrightnessQuadResult quad = FindBrightnessQuadTreeLod(
+        sourceTexture,
+        sourceSampler,
+        QuadTreeSourceUv(result.cellCenter, flipY),
+        minimumDivisions,
+        maximumIterations,
+        stopBrightness);
+
+    result.center = QuadTreeSourceUv(quad.center, flipY);
+    result.size = quad.size;
+    result.brightness = quad.brightness;
+
+    float2 representativeCell = floor(result.center * gridSize);
+    float cellDistance = abs(float2(cellId).x - representativeCell.x) +
+                         abs(float2(cellId).y - representativeCell.y);
+    result.keep = step(cellDistance, 0.5);
     return result;
 }
 

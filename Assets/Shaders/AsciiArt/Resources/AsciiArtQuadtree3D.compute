@@ -1,0 +1,40 @@
+#pragma kernel EvaluateQuadtree
+#pragma target 4.5
+
+#include "Assets/Shaders/Common/QuadTree.hlsl"
+
+TEXTURE2D(_MainTex);
+SAMPLER(sampler_MainTex);
+
+RWStructuredBuffer<QuadTreeLeafData> _QuadTreeLeaves;
+
+int _GridColumns;
+int _GridRows;
+float _GridAspect;
+float _QuadTreeMinDivisions;
+float _QuadTreeMaxIterations;
+float _QuadTreeThreshold;
+float _FlipY;
+
+[numthreads(8, 8, 1)]
+void EvaluateQuadtree(uint3 dispatchId : SV_DispatchThreadID)
+{
+    uint columns = (uint)max(_GridColumns, 1);
+    uint rows = (uint)max(_GridRows, 1);
+
+    if (dispatchId.x >= columns || dispatchId.y >= rows)
+        return;
+
+    uint globalIndex = dispatchId.y * columns + dispatchId.x;
+    _QuadTreeLeaves[globalIndex] = EvaluateQuadTreeCell(
+        _MainTex,
+        sampler_MainTex,
+        globalIndex,
+        columns,
+        rows,
+        _GridAspect,
+        _QuadTreeMinDivisions,
+        _QuadTreeMaxIterations,
+        _QuadTreeThreshold,
+        _FlipY);
+}

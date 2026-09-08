@@ -84,6 +84,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
+            StructuredBuffer<QuadTreeLeafData> _QuadTreeLeaves;
             TEXTURE2D(_Pattern0);
             SAMPLER(sampler_Pattern0);
             TEXTURE2D(_Pattern1);
@@ -163,35 +164,10 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 float keep;
             };
 
-            float2 MinimumQuadDivisions()
+            uint GlobalInstanceIndex(uint instanceID)
             {
-                float shortAxis = max(floor(_QuadTreeMinDivisions), 1.0);
-                float2 landscape = float2(
-                    max(round(shortAxis * _GridAspect), 1.0),
-                    shortAxis);
-                float2 portrait = float2(
-                    shortAxis,
-                    max(round(shortAxis / max(_GridAspect, 0.0001)), 1.0));
-                return lerp(portrait, landscape, step(1.0, _GridAspect));
-            }
-
-            int MaximumQuadIterations(float2 minDivisions)
-            {
-                // A quadtree iteration doubles both axes. Cap the depth by
-                // the smaller grid ratio so leaf representatives remain
-                // unique grid cells and cannot create empty scan lines.
-                float ratioX = max(_GridColumns / max(minDivisions.x, 1.0), 1.0);
-                float ratioY = max(_GridRows / max(minDivisions.y, 1.0), 1.0);
-                float ratio = max(min(ratioX, ratioY), 1.0);
-                int resolutionDepth = 1 + (int)floor(log2(ratio));
-                int requestedDepth = (int)floor(max(_QuadTreeMaxIterations, 1.0));
-                return min(requestedDepth, resolutionDepth);
-            }
-
-            float2 SourceUv(float2 uv)
-            {
-                uv.y = lerp(uv.y, 1.0 - uv.y, step(0.5, _FlipY));
-                return uv;
+                uint baseIndex = (uint)max(round(_InstanceBaseIndex), 0.0);
+                return instanceID + baseIndex;
             }
 
             AdaptiveLeaf GetAdaptiveLeaf(uint instanceID)
@@ -199,26 +175,12 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 AdaptiveLeaf result;
                 result.gridSize = float2(max(_GridColumns, 1.0), max(_GridRows, 1.0));
 
-                float globalIndex = (float)instanceID + max(_InstanceBaseIndex, 0.0);
-                float2 cellId = float2(
-                    fmod(globalIndex, result.gridSize.x),
-                    floor(globalIndex / result.gridSize.x));
-                result.cellCenter = (cellId + 0.5) / result.gridSize;
-
-                float2 minDivisions = MinimumQuadDivisions();
-                result.quad = FindBrightnessQuadTreeLod(
-                    _MainTex,
-                    sampler_MainTex,
-                    SourceUv(result.cellCenter),
-                    minDivisions,
-                    MaximumQuadIterations(minDivisions),
-                    _QuadTreeThreshold);
-                result.quad.center = SourceUv(result.quad.center);
-
-                float2 representativeCell = floor(result.quad.center * result.gridSize);
-                float cellDistance = abs(cellId.x - representativeCell.x) +
-                                     abs(cellId.y - representativeCell.y);
-                result.keep = step(cellDistance, 0.5);
+                QuadTreeLeafData leaf = _QuadTreeLeaves[GlobalInstanceIndex(instanceID)];
+                result.quad.center = leaf.center;
+                result.quad.size = leaf.size;
+                result.quad.brightness = leaf.brightness;
+                result.cellCenter = leaf.cellCenter;
+                result.keep = leaf.keep;
                 return result;
             }
 
@@ -423,8 +385,9 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-                AdaptiveLeaf leaf = GetAdaptiveLeaf(input.instanceID);
-                float globalIndex = (float)input.instanceID + max(_InstanceBaseIndex, 0.0);
+                uint instanceID = input.instanceID;
+                AdaptiveLeaf leaf = GetAdaptiveLeaf(instanceID);
+                float globalIndex = (float)GlobalInstanceIndex(instanceID);
                 float3 motion = InstanceMotionData(globalIndex, _MotionActiveThreshold);
                 float motionSignal = motion.x * sin(_Time.y * _DepthMotionSpeed * motion.z + motion.y);
 
@@ -551,8 +514,9 @@ Shader "Hidden/ASCII Art Quadtree 3D"
                 ShadowVaryings output;
                 UNITY_SETUP_INSTANCE_ID(input);
 
-                AdaptiveLeaf leaf = GetAdaptiveLeaf(input.instanceID);
-                float globalIndex = (float)input.instanceID + max(_InstanceBaseIndex, 0.0);
+                uint instanceID = input.instanceID;
+                AdaptiveLeaf leaf = GetAdaptiveLeaf(instanceID);
+                float globalIndex = (float)GlobalInstanceIndex(instanceID);
                 float3 motion = InstanceMotionData(globalIndex, _MotionActiveThreshold);
                 float motionSignal = motion.x * sin(_Time.y * _DepthMotionSpeed * motion.z + motion.y);
 

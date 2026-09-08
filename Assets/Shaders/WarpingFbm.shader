@@ -6,9 +6,27 @@ Shader "Unlit/WarpingFbm"
         // https://www.shadertoy.com/view/lsl3RH
         _MainTex ("Texture", 2D) = "white" {}
         _Size ("Size", Float) = 1
+        _PatternScale ("Pattern Scale", Range(0.1, 4)) = 1
         _Offset ("Canvas Offset (XY)", Vector) = (0, 0, 0, 0)
         _CanvasAspect ("Canvas Aspect (W/H)", Float) = 1
         _TimeScale ("Animation Speed", Float) = 1
+        _WarpStrength ("Radial Warp Strength", Range(0, 0.2)) = 0.03
+        _WarpFrequency ("Radial Warp Frequency (XY)", Vector) = (4.1, 4.3, 0, 0)
+        _WarpSpeed ("Radial Warp Speed (XY)", Vector) = (0.27, 0.23, 0, 0)
+        _DomainWarpStrength ("Domain Warp Strength", Range(0, 0.2)) = 0.04
+        _DomainWarpScale ("Domain Warp Scale", Range(0, 8)) = 3
+        _DetailStrength ("FBM Detail Strength", Range(0, 2)) = 1
+        _ColorA ("Palette A", Color) = (0.2, 0.1, 0.4, 1)
+        _ColorB ("Palette B", Color) = (0.3, 0.05, 0.05, 1)
+        _ColorC ("Palette C", Color) = (0.9, 0.9, 0.9, 1)
+        _ColorD ("Palette D", Color) = (0, 0.2, 0.4, 1)
+        _ColorContrast ("Color Contrast", Range(0, 2)) = 1
+        _ColorBrightness ("Color Brightness", Range(0, 3)) = 1
+        _RimStrength ("Rim Highlight Strength", Range(0, 2)) = 1
+        _LightDirection ("Light Direction", Vector) = (0.9, 0.2, -0.4, 0)
+        _AmbientColor ("Ambient Color", Color) = (0.7, 0.9, 0.95, 1)
+        _LightColor ("Light Color", Color) = (0.15, 0.1, 0.05, 1)
+        _LightStrength ("Light Strength", Range(0, 3)) = 1
     }
 
     SubShader
@@ -48,8 +66,26 @@ Shader "Unlit/WarpingFbm"
                 float4 _MainTex_ST;
                 float4 _Offset;
                 float _Size;
+                float _PatternScale;
                 float _CanvasAspect;
                 float _TimeScale;
+                float _WarpStrength;
+                float4 _WarpFrequency;
+                float4 _WarpSpeed;
+                float _DomainWarpStrength;
+                float _DomainWarpScale;
+                float _DetailStrength;
+                float4 _ColorA;
+                float4 _ColorB;
+                float4 _ColorC;
+                float4 _ColorD;
+                float _ColorContrast;
+                float _ColorBrightness;
+                float _RimStrength;
+                float4 _LightDirection;
+                float4 _AmbientColor;
+                float4 _LightColor;
+                float _LightStrength;
             CBUFFER_END
 
             Varyings Vert(Attributes input)
@@ -120,13 +156,14 @@ Shader "Unlit/WarpingFbm"
             // float func(vec2 q, out vec4 ron)
             float WarpedField(float2 q, float time, out float4 ron)
             {
-                q += 0.03 * sin(float2(0.27, 0.23) * time +
-                    length(q) * float2(4.1, 4.3));
+                q += _WarpStrength * sin(_WarpSpeed.xy * time +
+                    length(q) * _WarpFrequency.xy);
 
                 float2 o = Fbm4_2(0.9 * q);
-                o += 0.04 * sin(float2(0.12, 0.14) * time + length(o));
+                o += _DomainWarpStrength * sin(float2(0.12, 0.14) * time +
+                    length(o));
 
-                float2 n = Fbm6_2(3.0 * o);
+                float2 n = Fbm6_2(_DomainWarpScale * o) * _DetailStrength;
                 ron = float4(o, n);
 
                 float f = 0.5 + 0.5 * Fbm4(1.8 * q + 6.0 * n);
@@ -141,7 +178,7 @@ Shader "Unlit/WarpingFbm"
                 // Shadertoy:
                 // vec2 p = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
                 float2 p = (input.uv * 2.0 - 1.0) * float2(safeAspect, 1.0);
-                p = p / safeSize + _Offset.xy;
+                p = p / safeSize * _PatternScale + _Offset.xy;
 
                 float time = _Time.y * _TimeScale;
                 float epsilon = 2.0 / max(_ScreenParams.y * safeSize, 1.0);
@@ -149,12 +186,16 @@ Shader "Unlit/WarpingFbm"
                 float4 on;
                 float f = WarpedField(p, time, on);
 
-                float3 color = lerp(float3(0.2, 0.1, 0.4), float3(0.3, 0.05, 0.05), f);
-                color = lerp(color, float3(0.9, 0.9, 0.9), dot(on.zw, on.zw));
-                color = lerp(color, float3(0.4, 0.3, 0.3), 0.2 + 0.5 * on.y * on.y);
-                color = lerp(color, float3(0.0, 0.2, 0.4),
+                float3 color = lerp(_ColorA.rgb, _ColorB.rgb, f);
+                color = lerp(color, _ColorC.rgb,
+                    saturate(_RimStrength * dot(on.zw, on.zw)));
+                color = lerp(color, float3(0.4, 0.3, 0.3),
+                    0.2 + 0.5 * on.y * on.y);
+                color = lerp(color, _ColorD.rgb,
                     0.5 * smoothstep(1.2, 1.3, abs(on.z) + abs(on.w)));
-                color = saturate(color * f * 2.0);
+                color = saturate(color * f * 2.0 * _ColorBrightness);
+                color = lerp(float3(0.5, 0.5, 0.5), color,
+                    _ColorContrast);
 
                 // The original uses manual derivatives for better quality.
                 float4 derivativeData;
@@ -162,11 +203,11 @@ Shader "Unlit/WarpingFbm"
                 float fieldY = WarpedField(p + float2(0.0, epsilon), time, derivativeData) - f;
                 float3 normal = normalize(float3(fieldX, 2.0 * epsilon, fieldY) + 1e-6);
 
-                float3 lightDirection = normalize(float3(0.9, 0.2, -0.4));
+                float3 lightDirection = normalize(_LightDirection.xyz);
                 float diffuse = saturate(0.3 + 0.7 * dot(normal, lightDirection));
-                float3 lighting = float3(0.70, 0.90, 0.95) * (normal.y * 0.5 + 0.5)
-                    + float3(0.15, 0.10, 0.05) * diffuse;
-                color *= 1.2 * lighting;
+                float3 lighting = _AmbientColor.rgb * (normal.y * 0.5 + 0.5)
+                    + _LightColor.rgb * diffuse;
+                color *= 1.2 * lighting * _LightStrength;
 
                 color = 1.0 - color;
                 color = 1.1 * color * color;

@@ -68,6 +68,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
     [Range(0f, 1f)] [SerializeField] private float pulseDarkBrightness = 0.15f;
 
     [Header("Rendering")]
+    [SerializeField] private bool castShadows = true;
     [Min(1f)] [SerializeField] private float boundsPadding = 2f;
 
     private static readonly int InitialPositionBufferId = Shader.PropertyToID("_InitialPositionBuffer");
@@ -171,7 +172,7 @@ public sealed class ProceduralTorusTrail : MonoBehaviour
         {
             layer = gameObject.layer,
             worldBounds = CalculateWorldBounds(),
-            shadowCastingMode = ShadowCastingMode.Off,
+            shadowCastingMode = castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off,
             receiveShadows = false
         };
 

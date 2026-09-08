@@ -150,5 +150,99 @@ Shader "GraphicsPlayground/Procedural/Torus Trail"
             }
             ENDHLSL
         }
+
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+
+            Cull Off
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma vertex ShadowVert
+            #pragma fragment ShadowFrag
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            struct VertexData
+            {
+                float3 position;
+                float3 normal;
+                float2 uv;
+            };
+
+            StructuredBuffer<int> _IndexBuffer;
+            StructuredBuffer<VertexData> _VertexBuffer;
+
+            int _VerticesPerTrail;
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseColor;
+                float4 _RimColor;
+                float _RimPower;
+                float _EmissionStrength;
+                float _PulseSpeed;
+                float _PulseWidth;
+                float _PulseIntensity;
+                float _PulseSegmentPhase;
+                float _PulseTrailPhase;
+                float _PulseDarkBrightness;
+                float _PaletteWaveSpeed;
+                float _PaletteSegmentPhase;
+                float _PaletteTrailPhase;
+                float3 _OffsetPosition;
+                float4x4 _LocalToWorld;
+                float4x4 _WorldToLocal;
+            CBUFFER_END
+
+            // URP sets these while rendering each directional or punctual
+            // light's shadow map.
+            float3 _LightDirection;
+            float3 _LightPosition;
+
+            struct ShadowAttributes
+            {
+                uint vertexID : SV_VertexID;
+                uint instanceID : SV_InstanceID;
+            };
+
+            struct ShadowVaryings
+            {
+                float4 positionCS : SV_POSITION;
+            };
+
+            ShadowVaryings ShadowVert(ShadowAttributes input)
+            {
+                ShadowVaryings output;
+                uint localIndex = _IndexBuffer[input.vertexID];
+                uint bufferIndex = localIndex + input.instanceID * _VerticesPerTrail;
+                VertexData vertex = _VertexBuffer[bufferIndex];
+
+                float3 positionWS = mul(_LocalToWorld, float4(vertex.position, 1.0)).xyz;
+                float3 normalWS = SafeNormalize(mul(vertex.normal, (float3x3)_WorldToLocal));
+
+                #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                    float3 lightDirectionWS = SafeNormalize(_LightPosition - positionWS);
+                #else
+                    float3 lightDirectionWS = _LightDirection;
+                #endif
+
+                float3 biasedPositionWS = ApplyShadowBias(positionWS, normalWS, lightDirectionWS);
+                output.positionCS = ApplyShadowClamping(TransformWorldToHClip(biasedPositionWS));
+                return output;
+            }
+
+            half4 ShadowFrag(ShadowVaryings input) : SV_Target
+            {
+                return 0;
+            }
+            ENDHLSL
+        }
     }
 }
