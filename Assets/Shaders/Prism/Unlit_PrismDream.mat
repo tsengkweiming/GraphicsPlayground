@@ -29,6 +29,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _CanvasAspect: 4.79
     - _ColorSpread: 1.2
     - _Exposure: 1
     - _PatternBlend: 0.357
@@ -38,6 +39,7 @@ Material:
     - _Size: 0.72
     - _StepScale: 1.14
     - _WarpStrength: 0
-    m_Colors: []
+    m_Colors:
+    - _Offset: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

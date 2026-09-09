@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[System.Serializable]
 public class PhysarumSimulationParam : ParmeterController<PhysarumSimulationParam>
 {
     public enum Pattern
@@ -48,7 +49,8 @@ public class PhysarumSimulationParam : ParmeterController<PhysarumSimulationPara
     }
     
     public Pattern selectedPattern = Pattern.OrganicVeins;
-    public Pattern appliedPattern = Pattern.OrganicVeins;
+    public SpawnShape spawnShape = SpawnShape.Disc;
+    
     [Header("Simulation")]
     public Vector2Int resolution = new Vector2Int(1024, 1024);
     [Min(1024)] public int agentCount = 262144;
@@ -56,8 +58,6 @@ public class PhysarumSimulationParam : ParmeterController<PhysarumSimulationPara
     [Min(0)] public int seed = 1337;
     public bool paused;
 
-    public SpawnShape spawnShape = SpawnShape.Disc;
-    public SpawnShape initializedSpawnShape = SpawnShape.Disc;
     [Header("Initial Distribution")]
     public Vector2 spawnCenter = new Vector2(0.5f, 0.5f);
     [Range(0.01f, 1f)] public float spawnRadius = 0.82f;

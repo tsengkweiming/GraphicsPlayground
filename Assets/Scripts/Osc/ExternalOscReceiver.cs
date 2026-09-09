@@ -7,6 +7,8 @@ namespace Osc
 {
     public class ExternalOscReceiver : OscReceiver
     {
+        [SerializeField] private RandomGameObjectActivator _randomGameObjectActivator;
+        
         private Dictionary<string, Action<List<string>>> _syncActionMap = new();
         
         private readonly Dictionary<string, Action<ExternalOscReceiver, List<string>>> _oscCallBacks =
@@ -33,10 +35,18 @@ namespace Osc
             if (msg.Count > 1 && int.TryParse(msg[1], out int oscId))
             {
                 StageController.Instance.SetStage(oscId);
+                _randomGameObjectActivator.SetRandomObjects();
             }
             if (msg.Count > 2 && int.TryParse(msg[2], out int vfxSwitch))
             {
                 StageController.Instance.SetTestStage(vfxSwitch > 0);
+            }
+            if (msg.Count > 3 && int.TryParse(msg[3], out int textMode))
+            {
+                if(textMode == 1)
+                    _randomGameObjectActivator.SetRandomObjects();
+                
+                _randomGameObjectActivator.enabled = textMode != 2;
             }
         }
         

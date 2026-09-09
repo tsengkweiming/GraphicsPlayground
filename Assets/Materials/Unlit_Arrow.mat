@@ -42,6 +42,8 @@ Material:
     m_Colors:
     - _Color1: {r: 0, g: 0.1, b: 0.55, a: 1}
     - _Color2: {r: 0.7, g: 0.5, b: 0.3, a: 1}
+    - _ColorA: {r: 1, g: 1, b: 1, a: 1}
+    - _ColorB: {r: 0.10062885, g: 0.10062885, b: 0.10062885, a: 1}
     - _Count: {r: 11.5, g: 1, b: 0, a: 0}
     - _LookAt: {r: 0, g: -0.5, b: 1, a: 1}
     - _RayOrigin: {r: 0, g: 1, b: -3.5, a: 1}

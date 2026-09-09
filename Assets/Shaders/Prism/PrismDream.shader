@@ -5,7 +5,7 @@ Shader "Unlit/PrismDream"
         _MainTex ("Texture", 2D) = "white" {}
         _Size ("Size", Float) = 0.1
         _Offset ("Canvas Offset (XY)", Vector) = (0, 0, 0, 0)
-        _CanvasAspect ("Canvas Aspect (W/H)", Float) = 1
+        _CanvasAspect ("Canvas Aspect (W/H)", Float) = 4
         _ShapeMode ("Shape Mode", Range(0, 6)) = 0
         _PatternBlend ("Pattern Blend", Range(0, 1)) = 0
         _RepeatScale ("Repeat Scale", Range(0.25, 4)) = 1.15

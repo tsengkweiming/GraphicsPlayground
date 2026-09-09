@@ -30,7 +30,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _CanvasAspect: 3.46
+    - _CanvasAspect: 4.79
     - _DirSwitch: 1
     - _Size: 0.41
     m_Colors:

@@ -8,8 +8,8 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Hatch Pattern Image
-  m_Shader: {fileID: 4800000, guid: b775bd8c04cb4f9786c38ba8ce701e99, type: 3}
-  m_Parent: {fileID: 0}
+  m_Shader: {fileID: 4800000, guid: ee8823858af7e1f4d9c15f4895dbc1f5, type: 3}
+  m_Parent: {fileID: 2100000, guid: d337f543fcc2ce44797c21fa21bdffb2, type: 2}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords: []
@@ -23,27 +23,38 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: b7d2cb946d67dfe4ea3f0c694d4fc9ff, type: 3}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern0:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern3:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Pattern4:
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Angle: 0
-    - _BrightnessLift: 0
-    - _CanvasAspect: 0.71875
-    - _ColorDivisions: 4
-    - _CoverageSoftness: 1.06
-    - _FlipSourceY: 0
-    - _ReferenceWidth: 736
+    - _Contrast: 1
+    - _Gamma: 1
+    - _HueShift: 0
+    - _PosterizeLevels: 5
     - _Resolution: 122.7
-    - _ShowSource: 0
-    - _StrokeWeight: 2
     m_Colors:
     - _BackgroundColor: {r: 1, g: 1, b: 1, a: 1}
-    - _Ink0: {r: 1, g: 0.733333, b: 0.733333, a: 1}
-    - _Ink1: {r: 0.8, g: 0.8, b: 0.8, a: 1}
-    - _Ink2: {r: 0.933333, g: 0.933333, b: 0, a: 1}
-    - _Ink3: {r: 0, g: 0.666667, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

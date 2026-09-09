@@ -181,6 +181,103 @@ public sealed class PhysarumSimulation : MonoBehaviour
     public bool IsPaused => paused;
     public Pattern SelectedPattern => selectedPattern;
 
+    public PhysarumSimulationParam Param
+    {
+        get => new PhysarumSimulationParam
+        {
+            selectedPattern = (PhysarumSimulationParam.Pattern)selectedPattern,
+            resolution = resolution,
+            agentCount = agentCount,
+            iterationsPerFrame = iterationsPerFrame,
+            seed = seed,
+            paused = paused,
+            spawnShape = (PhysarumSimulationParam.SpawnShape)spawnShape,
+            spawnCenter = spawnCenter,
+            spawnRadius = spawnRadius,
+            spawnThickness = spawnThickness,
+            sensorDistance = ToParam(sensorDistance),
+            sensorAngle = ToParam(sensorAngle),
+            rotationAngle = ToParam(rotationAngle),
+            moveDistance = ToParam(moveDistance),
+            responseProbeForwardOffset = responseProbeForwardOffset,
+            responseProbeVerticalOffset = responseProbeVerticalOffset,
+            sensedValueScale = sensedValueScale,
+            bilinearSensing = bilinearSensing,
+            turnNoiseDegrees = turnNoiseDegrees,
+            respawnChance = respawnChance,
+            diffusion = diffusion,
+            decay = decay,
+            depositStrength = depositStrength,
+            depositCountLimit = depositCountLimit,
+            trailValueLimit = trailValueLimit,
+            displayMode = (PhysarumSimulationParam.DisplayMode)displayMode,
+            backgroundColor = backgroundColor,
+            shadowColor = shadowColor,
+            midColor = midColor,
+            highlightColor = highlightColor,
+            trailExposure = trailExposure,
+            particleExposure = particleExposure,
+            contrast = contrast,
+            colorSplit = colorSplit,
+            particleHighlight = particleHighlight
+        };
+        set => ApplyParam(value);
+    }
+
+    private void ApplyParam(PhysarumSimulationParam value)
+    {
+        if (value == null)
+            return;
+
+        selectedPattern = (Pattern)value.selectedPattern;
+        resolution = value.resolution;
+        agentCount = value.agentCount;
+        iterationsPerFrame = value.iterationsPerFrame;
+        seed = value.seed;
+        paused = value.paused;
+        spawnShape = (SpawnShape)value.spawnShape;
+        spawnCenter = value.spawnCenter;
+        spawnRadius = value.spawnRadius;
+        spawnThickness = value.spawnThickness;
+        sensorDistance = FromParam(value.sensorDistance);
+        sensorAngle = FromParam(value.sensorAngle);
+        rotationAngle = FromParam(value.rotationAngle);
+        moveDistance = FromParam(value.moveDistance);
+        responseProbeForwardOffset = value.responseProbeForwardOffset;
+        responseProbeVerticalOffset = value.responseProbeVerticalOffset;
+        sensedValueScale = value.sensedValueScale;
+        bilinearSensing = value.bilinearSensing;
+        turnNoiseDegrees = value.turnNoiseDegrees;
+        respawnChance = value.respawnChance;
+        diffusion = value.diffusion;
+        decay = value.decay;
+        depositStrength = value.depositStrength;
+        depositCountLimit = value.depositCountLimit;
+        trailValueLimit = value.trailValueLimit;
+        displayMode = (DisplayMode)value.displayMode;
+        backgroundColor = value.backgroundColor;
+        shadowColor = value.shadowColor;
+        midColor = value.midColor;
+        highlightColor = value.highlightColor;
+        trailExposure = value.trailExposure;
+        particleExposure = value.particleExposure;
+        contrast = value.contrast;
+        colorSplit = value.colorSplit;
+        particleHighlight = value.particleHighlight;
+
+        OnValidate();
+    }
+
+    private static PhysarumSimulationParam.SignalCurve ToParam(SignalCurve value)
+    {
+        return new PhysarumSimulationParam.SignalCurve(value.constant, value.response, value.exponent);
+    }
+
+    private static SignalCurve FromParam(PhysarumSimulationParam.SignalCurve value)
+    {
+        return new SignalCurve(value.constant, value.response, value.exponent);
+    }
+
     private void Reset()
     {
         LoadAutomaticAssets();
@@ -413,7 +510,7 @@ public sealed class PhysarumSimulation : MonoBehaviour
                 break;
 
             case Pattern.CellularFans:
-                spawnShape = SpawnShape.HorizontalBand;
+                spawnShape = SpawnShape.Disc;
                 spawnThickness = 0.045f;
                 sensorDistance = new SignalCurve(4f, 34f, 2.6f);
                 sensorAngle = new SignalCurve(95f, -72f, 0.9f);

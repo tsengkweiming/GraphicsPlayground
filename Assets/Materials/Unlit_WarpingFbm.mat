@@ -30,9 +30,27 @@ Material:
     m_Ints: []
     m_Floats:
     - _CanvasAspect: 5.766667
+    - _ColorBrightness: 1
+    - _ColorContrast: 1
+    - _DetailStrength: 1
+    - _DomainWarpScale: 3
+    - _DomainWarpStrength: 0.04
+    - _LightStrength: 1.2
+    - _PatternScale: 1
+    - _RimStrength: 1
     - _Size: 1
     - _TimeScale: 1
+    - _WarpStrength: 0.1518
     m_Colors:
+    - _AmbientColor: {r: 0.7, g: 0.9, b: 0.95, a: 1}
+    - _ColorA: {r: 0.2, g: 0.1, b: 0.4, a: 1}
+    - _ColorB: {r: 0.3, g: 0.05, b: 0.05, a: 1}
+    - _ColorC: {r: 0.9, g: 0.9, b: 0.9, a: 1}
+    - _ColorD: {r: 0.4, g: 0.10849255, b: 0, a: 1}
+    - _LightColor: {r: 0.15, g: 0.1, b: 0.05, a: 1}
+    - _LightDirection: {r: 0.9, g: 0.2, b: -0.4, a: 0}
     - _Offset: {r: 0, g: 0, b: 0, a: 0}
+    - _WarpFrequency: {r: 4.1, g: 4.3, b: 0, a: 0}
+    - _WarpSpeed: {r: 0.27, g: 0.23, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
