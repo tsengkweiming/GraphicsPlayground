@@ -31,6 +31,14 @@ public sealed class PhysarumSimulation : MonoBehaviour
         TrailAndParticles
     }
 
+    public enum FieldMode
+    {
+        SeekBright,
+        SeekDark,
+        FollowContoursClockwise,
+        FollowContoursCounterClockwise
+    }
+
     [Serializable]
     public struct SignalCurve
     {
@@ -55,6 +63,26 @@ public sealed class PhysarumSimulation : MonoBehaviour
     [Header("Assets (automatic when left empty)")]
     [SerializeField] private ComputeShader simulationCompute;
     [SerializeField] private Shader displayShader;
+    
+    [Header("Input")]
+    [Tooltip("Optional grayscale field texture. Takes priority over Source Camera when assigned.")]
+    [SerializeField] private Texture sourceTexture;
+    [Tooltip("Camera used as a live field map. A target texture is created automatically when the camera has none.")]
+    [SerializeField] private Camera sourceCamera;
+    [Tooltip("Seek grayscale extrema or travel tangentially along grayscale contours.")]
+    [SerializeField] private FieldMode fieldMode = FieldMode.SeekBright;
+    [Tooltip("Steering response to the grayscale gradient. Set to zero to disable field steering.")]
+    [Range(0f, 10f)] [SerializeField] private float fieldStrength = 3f;
+    [Tooltip("Distance in simulation pixels used to estimate the grayscale gradient.")]
+    [Range(0.5f, 64f)] [SerializeField] private float fieldGradientDistance = 4f;
+    [Tooltip("Maximum field-driven heading change per simulation iteration.")]
+    [Range(0f, 180f)] [SerializeField] private float fieldMaxTurnDegrees = 30f;
+    [Tooltip("Expands or compresses grayscale contrast around middle gray before steering.")]
+    [Range(0.1f, 8f)] [SerializeField] private float fieldContrast = 1f;
+    [Tooltip("Positive values move faster in bright areas; negative values move faster in dark areas.")]
+    [Range(-1f, 1f)] [SerializeField] private float fieldSpeedInfluence;
+    [Tooltip("Flip this when the camera/texture field appears vertically mirrored.")]
+    [SerializeField] private bool flipFieldY;
 
     [SerializeField] private Pattern selectedPattern = Pattern.OrganicVeins;
     [SerializeField, HideInInspector] private Pattern appliedPattern = Pattern.OrganicVeins;
@@ -132,6 +160,15 @@ public sealed class PhysarumSimulation : MonoBehaviour
     private static readonly int BilinearSensingId = Shader.PropertyToID("_BilinearSensing");
     private static readonly int TurnNoiseId = Shader.PropertyToID("_TurnNoise");
     private static readonly int RespawnChanceId = Shader.PropertyToID("_RespawnChance");
+    private static readonly int FieldMapId = Shader.PropertyToID("_FieldMap");
+    private static readonly int HasFieldMapId = Shader.PropertyToID("_HasFieldMap");
+    private static readonly int FieldModeId = Shader.PropertyToID("_FieldMode");
+    private static readonly int FieldStrengthId = Shader.PropertyToID("_FieldStrength");
+    private static readonly int FieldGradientDistanceId = Shader.PropertyToID("_FieldGradientDistance");
+    private static readonly int FieldMaxTurnId = Shader.PropertyToID("_FieldMaxTurn");
+    private static readonly int FieldContrastId = Shader.PropertyToID("_FieldContrast");
+    private static readonly int FieldSpeedInfluenceId = Shader.PropertyToID("_FieldSpeedInfluence");
+    private static readonly int FlipFieldYId = Shader.PropertyToID("_FlipFieldY");
     private static readonly int DiffusionId = Shader.PropertyToID("_Diffusion");
     private static readonly int DecayId = Shader.PropertyToID("_Decay");
     private static readonly int DepositStrengthId = Shader.PropertyToID("_DepositStrength");
@@ -163,6 +200,9 @@ public sealed class PhysarumSimulation : MonoBehaviour
     private Material originalMaterial;
     private Mesh generatedQuad;
     private MeshRenderer meshRenderer;
+    private RenderTexture ownedSourceCameraTexture;
+    private Camera configuredSourceCamera;
+    private RenderTexture originalSourceCameraTarget;
 
     private int initializeAgentsKernel;
     private int clearSimulationKernel;
@@ -219,7 +259,14 @@ public sealed class PhysarumSimulation : MonoBehaviour
             particleExposure = particleExposure,
             contrast = contrast,
             colorSplit = colorSplit,
-            particleHighlight = particleHighlight
+            particleHighlight = particleHighlight,
+            fieldMode = (PhysarumSimulationParam.FieldMode)fieldMode,
+            fieldStrength = fieldStrength,
+            fieldGradientDistance = fieldGradientDistance,
+            fieldMaxTurnDegrees = fieldMaxTurnDegrees,
+            fieldContrast = fieldContrast,
+            fieldSpeedInfluence = fieldSpeedInfluence,
+            flipFieldY = flipFieldY
         };
         set => ApplyParam(value);
     }
@@ -264,6 +311,13 @@ public sealed class PhysarumSimulation : MonoBehaviour
         contrast = value.contrast;
         colorSplit = value.colorSplit;
         particleHighlight = value.particleHighlight;
+        fieldMode = (FieldMode)value.fieldMode;
+        fieldStrength = value.fieldStrength;
+        fieldGradientDistance = value.fieldGradientDistance;
+        fieldMaxTurnDegrees = value.fieldMaxTurnDegrees;
+        fieldContrast = value.fieldContrast;
+        fieldSpeedInfluence = value.fieldSpeedInfluence;
+        flipFieldY = value.flipFieldY;
 
         OnValidate();
     }
@@ -318,12 +372,14 @@ public sealed class PhysarumSimulation : MonoBehaviour
     private void OnDisable()
     {
         ReleaseResources();
+        ReleaseOwnedSourceCameraTexture();
         ReleaseRendererResources();
     }
 
     private void OnDestroy()
     {
         ReleaseResources();
+        ReleaseOwnedSourceCameraTexture();
         ReleaseRendererResources();
 
         if (generatedQuad != null)
@@ -342,6 +398,11 @@ public sealed class PhysarumSimulation : MonoBehaviour
         moveDistance.exponent = Mathf.Max(0.01f, moveDistance.exponent);
         trailValueLimit = Mathf.Max(0.01f, trailValueLimit);
         depositCountLimit = Mathf.Max(1, depositCountLimit);
+        fieldStrength = Mathf.Max(0f, fieldStrength);
+        fieldGradientDistance = Mathf.Max(0.5f, fieldGradientDistance);
+        fieldMaxTurnDegrees = Mathf.Clamp(fieldMaxTurnDegrees, 0f, 180f);
+        fieldContrast = Mathf.Max(0.1f, fieldContrast);
+        fieldSpeedInfluence = Mathf.Clamp(fieldSpeedInfluence, -1f, 1f);
 
         if (Application.isPlaying && initialized &&
             (allocatedAgentCount != agentCount || allocatedResolution != resolution))
@@ -365,6 +426,55 @@ public sealed class PhysarumSimulation : MonoBehaviour
         }
     }
 
+    private Texture ResolveSource()
+    {
+        if (sourceTexture)
+        {
+            ReleaseOwnedSourceCameraTexture();
+            return sourceTexture;
+        }
+
+        if (!sourceCamera)
+        {
+            ReleaseOwnedSourceCameraTexture();
+            return null;
+        }
+
+        if (sourceCamera.targetTexture != null && sourceCamera.targetTexture != ownedSourceCameraTexture)
+        {
+            ReleaseOwnedSourceCameraTexture();
+            return sourceCamera.targetTexture;
+        }
+
+        bool needsCameraTexture = ownedSourceCameraTexture == null
+            || configuredSourceCamera != sourceCamera
+            || ownedSourceCameraTexture.width != resolution.x
+            || ownedSourceCameraTexture.height != resolution.y;
+
+        if (needsCameraTexture)
+        {
+            ReleaseOwnedSourceCameraTexture();
+            configuredSourceCamera = sourceCamera;
+            originalSourceCameraTarget = sourceCamera.targetTexture;
+            ownedSourceCameraTexture = new RenderTexture(
+                resolution.x,
+                resolution.y,
+                24,
+                RenderTextureFormat.ARGB32,
+                RenderTextureReadWrite.Linear)
+            {
+                name = "Physarum Field Camera",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            ownedSourceCameraTexture.Create();
+            sourceCamera.targetTexture = ownedSourceCameraTexture;
+        }
+
+        return ownedSourceCameraTexture;
+    }
+    
     public void ResetSimulation()
     {
         if (!EnsureResources())
@@ -595,6 +705,9 @@ public sealed class PhysarumSimulation : MonoBehaviour
 
         simulationCompute.SetBuffer(moveAgentsKernel, AgentsId, agentBuffer);
         simulationCompute.SetTexture(moveAgentsKernel, TrailReadId, trailRead);
+        Texture fieldMap = ResolveSource();
+        simulationCompute.SetInt(HasFieldMapId, fieldMap != null ? 1 : 0);
+        simulationCompute.SetTexture(moveAgentsKernel, FieldMapId, fieldMap != null ? fieldMap : Texture2D.blackTexture);
         simulationCompute.SetTexture(moveAgentsKernel, ParticleCountersId, particleCounters);
         simulationCompute.Dispatch(moveAgentsKernel, DivideRoundUp(agentCount, AgentThreadGroupSize), 1, 1);
 
@@ -627,6 +740,13 @@ public sealed class PhysarumSimulation : MonoBehaviour
         simulationCompute.SetInt(BilinearSensingId, bilinearSensing ? 1 : 0);
         simulationCompute.SetFloat(TurnNoiseId, turnNoiseDegrees * Mathf.Deg2Rad);
         simulationCompute.SetFloat(RespawnChanceId, respawnChance);
+        simulationCompute.SetInt(FieldModeId, (int)fieldMode);
+        simulationCompute.SetFloat(FieldStrengthId, fieldStrength);
+        simulationCompute.SetFloat(FieldGradientDistanceId, fieldGradientDistance);
+        simulationCompute.SetFloat(FieldMaxTurnId, fieldMaxTurnDegrees * Mathf.Deg2Rad);
+        simulationCompute.SetFloat(FieldContrastId, fieldContrast);
+        simulationCompute.SetFloat(FieldSpeedInfluenceId, fieldSpeedInfluence);
+        simulationCompute.SetInt(FlipFieldYId, flipFieldY ? 1 : 0);
         simulationCompute.SetFloat(DiffusionId, diffusion);
         simulationCompute.SetFloat(DecayId, decay);
         simulationCompute.SetFloat(DepositStrengthId, depositStrength);
@@ -770,6 +890,22 @@ public sealed class PhysarumSimulation : MonoBehaviour
         CoreUtils.Destroy(runtimeMaterial);
         runtimeMaterial = null;
         originalMaterial = null;
+    }
+
+    private void ReleaseOwnedSourceCameraTexture()
+    {
+        if (configuredSourceCamera != null && configuredSourceCamera.targetTexture == ownedSourceCameraTexture)
+            configuredSourceCamera.targetTexture = originalSourceCameraTarget;
+
+        if (ownedSourceCameraTexture != null)
+        {
+            ownedSourceCameraTexture.Release();
+            CoreUtils.Destroy(ownedSourceCameraTexture);
+        }
+
+        ownedSourceCameraTexture = null;
+        configuredSourceCamera = null;
+        originalSourceCameraTarget = null;
     }
 
     private static void Release(ref ComputeBuffer buffer)

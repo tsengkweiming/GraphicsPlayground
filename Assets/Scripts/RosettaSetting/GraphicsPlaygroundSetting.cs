@@ -3,6 +3,7 @@ using RosettaUI;
 using UnityEngine;
 using UnityEngine.UIElements;
 using PrefsGUI;
+using VJ.CameraMovement;
 
 public class GraphicsPlaygroundSetting : MonoBehaviour
 {
@@ -12,7 +13,13 @@ public class GraphicsPlaygroundSetting : MonoBehaviour
     
     [SerializeField] private AsciiArtQuadtree3DRenderer quadtreeRenderer;
     [SerializeField] private PhysarumSimulation physarumSimulation;
+    [SerializeField] private CameraController cameraController;
+    [SerializeField] private RandomTransformer[] randomTransformers;
+    [SerializeField] private RandomGameObjectActivator[] randomGameObjectActivators;
     
+    private PrefsAny<CameraControllerParam> _cameraControllerParam = new ("CameraControllerParam");
+    private PrefsList<RandomTransformerParam> _randomTransformerParamList = new ("RandomTransformerParamList");
+    private PrefsList<GameObjectActivatorParam> _gameObjectActivatorParamList = new ("GameObjectActivatorParamList");
     private PrefsList<AsciiQuadtreeParam> _quadtreeParams = new ("AsciiQuadtreeParam");
     private PrefsInt _quadtreeParamIndex = new ("QuadtreeParamIndex");
     private PrefsList<PhysarumSimulationParam> _physarumParams = new ("PhysarumSimulationParam");
@@ -44,6 +51,10 @@ public class GraphicsPlaygroundSetting : MonoBehaviour
             " (Press <color=red>D</color> to toggle)"
         };
 
+        var cameraControllerWindow = UI.Window(
+            UI.Field(() => _cameraControllerParam).RegisterValueChangeCallback(ApplySetting)
+        );
+
         var settingsWindow = UI.Window(
             // UI.Label("AsciiQuadtreeSetting"),
             UI.Field(() => _quadtreeParams).RegisterValueChangeCallback(ApplySetting),
@@ -57,8 +68,9 @@ public class GraphicsPlaygroundSetting : MonoBehaviour
 
         rootWindow = UI.Window(
             UI.Label(menu[0] + menu[1]),
-            UI.WindowLauncher(UI.Label("AsciiQuadtreeSetting"), settingsWindow),
-            UI.WindowLauncher(UI.Label("PhysarumSimulationSetting"), physarumSettingsWindow),
+            UI.WindowLauncher(UI.Label("CameraController"), cameraControllerWindow),
+            UI.WindowLauncher(UI.Label("AsciiQuadtree"), settingsWindow),
+            UI.WindowLauncher(UI.Label("PhysarumSimulation"), physarumSettingsWindow),
             UI.Button("Save", Prefs.Save)
         ).SetClosable(false);
         return rootWindow;
@@ -67,6 +79,9 @@ public class GraphicsPlaygroundSetting : MonoBehaviour
 
     private void ApplySetting()
     {
+        if (cameraController != null)
+            cameraController.Param = _cameraControllerParam.Get();
+        
         if (quadtreeRenderer != null && _quadtreeParams.Count > 0)
             quadtreeRenderer.Param = _quadtreeParams[Mathf.Clamp(_quadtreeParamIndex, 0, _quadtreeParams.Count - 1)];
     }

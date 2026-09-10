@@ -2264,6 +2264,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   simulationCompute: {fileID: 7200000, guid: 7a33f307864cdc24a9459d70d67fd184, type: 3}
   displayShader: {fileID: 4800000, guid: 593324b749db93f409c6b8657c5bc42f, type: 3}
+  sourceTexture: {fileID: 0}
+  sourceCamera: {fileID: 0}
+  fieldMode: 0
+  fieldStrength: 3
+  fieldGradientDistance: 4
+  fieldMaxTurnDegrees: 30
+  fieldContrast: 1
+  fieldSpeedInfluence: 0
+  flipFieldY: 0
   selectedPattern: 2
   appliedPattern: 2
   resolution: {x: 1440, y: 800}
@@ -3160,67 +3169,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!21 &634485324
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Sprite-Unlit-Default (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance)
-  m_Shader: {fileID: 4800000, guid: 13c02b14c4d048fa9653293d54f6e0e1, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords:
-  - ETC1_EXTERNAL_ALPHA
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _AlphaTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MaskTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _NormalMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - PixelSnap: 0
-    - _EnableExternalAlpha: 0
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _Flip: {r: 1, g: 1, b: 1, a: 1}
-    - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &637257469
 GameObject:
   m_ObjectHideFlags: 0
@@ -8898,6 +8846,67 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 940477872}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!21 &976973696
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Sprite-Unlit-Default (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance)
+  m_Shader: {fileID: 4800000, guid: 13c02b14c4d048fa9653293d54f6e0e1, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords:
+  - ETC1_EXTERNAL_ALPHA
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _AlphaTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MaskTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - PixelSnap: 0
+    - _EnableExternalAlpha: 0
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Flip: {r: 1, g: 1, b: 1, a: 1}
+    - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1000274717
 GameObject:
   m_ObjectHideFlags: 0
@@ -9447,7 +9456,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 634485324}
+  - {fileID: 976973696}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -10384,19 +10393,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8f5b9c3d1e2a6f4b7c8d9e0f1a2b3c4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enableRotation: 0
-  rotationSpeed: 30
-  rotateAxis: {x: 0, y: 1, z: 0}
-  rotationIntervalMin: 1
-  rotationIntervalMax: 3
-  enableScaling: 0
-  scaleSpeed: 0.25
-  uniformScale: 1
-  minScale: {x: 0.6, y: 0.6, z: 0.6}
-  maxScale: {x: 1.5, y: 1.5, z: 1.5}
-  scaleIntervalMin: 1
-  scaleIntervalMax: 3
-  lerpDuration: 1
+  _param:
+    enableRotation: 1
+    rotationSpeed: 90
+    rotateAxis: {x: 0, y: 1, z: 0}
+    rotationIntervalMin: 1
+    rotationIntervalMax: 3
+    enableScaling: 1
+    scaleSpeed: 0.5
+    uniformScale: 1
+    minScale: {x: 0.5, y: 0.5, z: 0.5}
+    maxScale: {x: 2, y: 2, z: 2}
+    scaleIntervalMin: 1
+    scaleIntervalMax: 3
+    lerpDuration: 1
 --- !u!114 &1291960813
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10418,10 +10428,12 @@ MonoBehaviour:
   - {fileID: 1199950374}
   - {fileID: 1781919106}
   - {fileID: 2093061445}
-  intervalSeconds: 6
-  randomCount: 1
-  activationDuration: 2
-  easeMode: 2
+  - {fileID: 1781919106}
+  _param:
+    intervalSeconds: 1
+    randomCount: 1
+    activationDuration: 0.5
+    easeMode: 2
 --- !u!1 &1303071759
 GameObject:
   m_ObjectHideFlags: 0
@@ -10796,19 +10808,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8f5b9c3d1e2a6f4b7c8d9e0f1a2b3c4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enableRotation: 0
-  rotationSpeed: 20
-  rotateAxis: {x: 0, y: 1, z: 0}
-  rotationIntervalMin: 1
-  rotationIntervalMax: 3
-  enableScaling: 0
-  scaleSpeed: 0.25
-  uniformScale: 1
-  minScale: {x: 0.5, y: 0.5, z: 0.5}
-  maxScale: {x: 1.5, y: 1.5, z: 1.5}
-  scaleIntervalMin: 1
-  scaleIntervalMax: 3
-  lerpDuration: 1
+  _param:
+    enableRotation: 1
+    rotationSpeed: 90
+    rotateAxis: {x: 0, y: 1, z: 0}
+    rotationIntervalMin: 1
+    rotationIntervalMax: 3
+    enableScaling: 1
+    scaleSpeed: 0.5
+    uniformScale: 1
+    minScale: {x: 0.5, y: 0.5, z: 0.5}
+    maxScale: {x: 2, y: 2, z: 2}
+    scaleIntervalMin: 1
+    scaleIntervalMax: 3
+    lerpDuration: 1
 --- !u!1 &1460888660
 GameObject:
   m_ObjectHideFlags: 0
@@ -14026,6 +14039,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   quadtreeRenderer: {fileID: 596860558}
   physarumSimulation: {fileID: 493046616}
+  cameraController: {fileID: 1138973965}
+  randomTransformers:
+  - {fileID: 1291960812}
+  - {fileID: 1390610386}
+  randomGameObjectActivators:
+  - {fileID: 1291960813}
 --- !u!114 &5766890261618526240
 MonoBehaviour:
   m_ObjectHideFlags: 0

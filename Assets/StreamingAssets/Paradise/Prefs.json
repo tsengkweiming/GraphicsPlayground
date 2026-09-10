@@ -7,6 +7,14 @@
         {
             "key": "QuadtreeParamIndex",
             "value": "{\"value\":0}"
+        },
+        {
+            "key": "PhysarumSimulationParam",
+            "value": "{\"value\":\"{\\\"value\\\":[{\\\"selectedPattern\\\":0,\\\"spawnShape\\\":1,\\\"fieldMode\\\":1,\\\"fieldStrength\\\":4.0,\\\"fieldGradientDistance\\\":8.0,\\\"fieldMaxTurnDegrees\\\":9.0,\\\"fieldContrast\\\":4.0,\\\"fieldSpeedInfluence\\\":0.0,\\\"flipFieldY\\\":false,\\\"resolution\\\":{\\\"x\\\":1440,\\\"y\\\":800},\\\"agentCount\\\":262144,\\\"iterationsPerFrame\\\":2,\\\"seed\\\":1337,\\\"paused\\\":false,\\\"spawnCenter\\\":{\\\"x\\\":0.5,\\\"y\\\":0.5},\\\"spawnRadius\\\":0.8199999928474426,\\\"spawnThickness\\\":0.07999999821186066,\\\"sensorDistance\\\":{\\\"constant\\\":10.0,\\\"response\\\":0.0,\\\"exponent\\\":1.0},\\\"sensorAngle\\\":{\\\"constant\\\":42.0,\\\"response\\\":0.0,\\\"exponent\\\":1.0},\\\"rotationAngle\\\":{\\\"constant\\\":28.0,\\\"response\\\":0.0,\\\"exponent\\\":1.0},\\\"moveDistance\\\":{\\\"constant\\\":1.25,\\\"response\\\":0.0,\\\"exponent\\\":1.0},\\\"responseProbeForwardOffset\\\":0.0,\\\"responseProbeVerticalOffset\\\":0.0,\\\"sensedValueScale\\\":0.699999988079071,\\\"bilinearSensing\\\":true,\\\"turnNoiseDegrees\\\":1.5,\\\"respawnChance\\\":0.0,\\\"diffusion\\\":0.8999999761581421,\\\"decay\\\":0.9649999737739563,\\\"depositStrength\\\":0.2800000011920929,\\\"depositCountLimit\\\":64,\\\"trailValueLimit\\\":12.0,\\\"displayMode\\\":2,\\\"backgroundColor\\\":{\\\"r\\\":0.0117647061124444,\\\"g\\\":0.019607843831181527,\\\"b\\\":0.0470588244497776,\\\"a\\\":1.0},\\\"shadowColor\\\":{\\\"r\\\":0.0235294122248888,\\\"g\\\":0.12941177189350129,\\\"b\\\":0.23137255012989045,\\\"a\\\":1.0},\\\"midColor\\\":{\\\"r\\\":0.11372549086809159,\\\"g\\\":0.8392156958580017,\\\"b\\\":0.7176470756530762,\\\"a\\\":1.0},\\\"highlightColor\\\":{\\\"r\\\":1.0,\\\"g\\\":0.8196078538894653,\\\"b\\\":0.4000000059604645,\\\"a\\\":1.0},\\\"trailExposure\\\":0.550000011920929,\\\"particleExposure\\\":1.399999976158142,\\\"contrast\\\":0.75,\\\"colorSplit\\\":0.47999998927116396,\\\"particleHighlight\\\":0.699999988079071}]}\"}"
+        },
+        {
+            "key": "PhysarumParamIndex",
+            "value": "{\"value\":0}"
         }
     ]
 }

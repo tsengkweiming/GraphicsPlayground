@@ -10,6 +10,17 @@ public enum EaseMode
     EaseInOut
 }
 
+[System.Serializable]
+public class GameObjectActivatorParam
+{
+    [Tooltip("Time between selections. A negative value disables automatic retriggering.")]
+    public float intervalSeconds = 1f;
+    [Min(0)] public int randomCount = 1;
+
+    [Min(0f)] public float activationDuration = 0.5f;
+
+    public EaseMode easeMode = EaseMode.EaseOut;
+}
 /// <summary>
 /// Periodically selects a configurable number of unique GameObjects and keeps
 /// only those objects active.
@@ -17,18 +28,10 @@ public enum EaseMode
 public class RandomGameObjectActivator : MonoBehaviour
 {
     [SerializeField] private GameObject[] targetObjects;
-
-    [Tooltip("Time between selections. A negative value disables automatic retriggering.")]
-    [SerializeField] private float intervalSeconds = 1f;
-
-    [Min(0)]
-    [SerializeField] private int randomCount = 1;
-
-    [Min(0f)]
-    [SerializeField] private float activationDuration = 0.5f;
-
-    [SerializeField] private EaseMode easeMode = EaseMode.EaseOut;
-
+    
+    [SerializeField] private GameObjectActivatorParam _param;
+    public GameObjectActivatorParam Param { get => _param; set => _param = value; }
+    
     private readonly List<GameObject> _validObjects = new List<GameObject>();
     private readonly List<GameObject> _activeObjects = new List<GameObject>();
     private readonly List<GameObject> _nextActiveObjects = new List<GameObject>();
@@ -48,7 +51,7 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private void Update()
     {
-        if (intervalSeconds < 0f)
+        if (_param.intervalSeconds < 0f)
         {
             _isTriggerScheduled = false;
             return;
@@ -137,7 +140,7 @@ public class RandomGameObjectActivator : MonoBehaviour
         _nextActiveObjects.Clear();
         _nextActiveLookup.Clear();
 
-        int selectionCount = Mathf.Clamp(randomCount, 0, _validObjects.Count);
+        int selectionCount = Mathf.Clamp(_param.randomCount, 0, _validObjects.Count);
         for (int i = 0; i < selectionCount; i++)
         {
             int randomIndex = Random.Range(i, _validObjects.Count);
@@ -151,14 +154,14 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private void ScheduleNextTrigger()
     {
-        if (intervalSeconds < 0f)
+        if (_param.intervalSeconds < 0f)
         {
             _isTriggerScheduled = false;
             return;
         }
 
         _isTriggerScheduled = true;
-        _nextTriggerTime = Time.time + Mathf.Max(0.01f, intervalSeconds);
+        _nextTriggerTime = Time.time + Mathf.Max(0.01f, _param.intervalSeconds);
     }
 
     private void ActivateObject(GameObject targetObject)
@@ -172,7 +175,7 @@ public class RandomGameObjectActivator : MonoBehaviour
         StopScaleInterpolation(targetObject);
         targetObject.SetActive(true);
 
-        float duration = Mathf.Max(0f, activationDuration);
+        float duration = Mathf.Max(0f, _param.activationDuration);
         if (duration <= Mathf.Epsilon)
         {
             targetObject.transform.localScale = targetScale;
@@ -227,7 +230,7 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private float EvaluateEase(float normalizedTime)
     {
-        switch (easeMode)
+        switch (_param.easeMode)
         {
             case EaseMode.EaseIn:
                 return normalizedTime * normalizedTime;
@@ -244,7 +247,7 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private void OnValidate()
     {
-        randomCount = Mathf.Max(0, randomCount);
-        activationDuration = Mathf.Max(0f, activationDuration);
+        _param.randomCount = Mathf.Max(0, _param.randomCount);
+        _param.activationDuration = Mathf.Max(0f, _param.activationDuration);
     }
 }

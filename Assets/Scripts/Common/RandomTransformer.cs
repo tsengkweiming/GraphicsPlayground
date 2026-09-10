@@ -38,7 +38,8 @@ public class RandomTransformerEditor : Editor
 }
 #endif
 
-public class RandomTransformer : MonoBehaviour
+[System.Serializable]
+public class RandomTransformerParam
 {
     [Header("Rotation")]
     public bool enableRotation = true;
@@ -58,6 +59,12 @@ public class RandomTransformer : MonoBehaviour
 
     [Header("Lerp Settings")]
     public float lerpDuration = 1f;
+}
+
+public class RandomTransformer : MonoBehaviour
+{
+    [SerializeField] private RandomTransformerParam _param;
+    public RandomTransformerParam Param { get =>  _param; set => _param = value; }
 
     private float rotationNextChangeTime;
     private float rotationCurrentDirection;
@@ -74,9 +81,9 @@ public class RandomTransformer : MonoBehaviour
 
     void Start()
     {
-        if (enableRotation)
+        if (_param.enableRotation)
             ScheduleNextRotation();
-        if (enableScaling)
+        if (_param.enableScaling)
             ScheduleNextScale();
     }
 
@@ -84,18 +91,18 @@ public class RandomTransformer : MonoBehaviour
     {
         if (isRotationLerping)
             UpdateRotationLerp();
-        else if (enableRotation)
+        else if (_param.enableRotation)
             UpdateRotation();
 
         if (isScaleLerping)
             UpdateScaleLerp();
-        else if (enableScaling)
+        else if (_param.enableScaling)
             UpdateScale();
     }
 
     void UpdateRotation()
     {
-        var rotate = rotateAxis * (rotationCurrentDirection * rotationSpeed * Time.deltaTime);
+        var rotate = _param.rotateAxis * (rotationCurrentDirection * _param.rotationSpeed * Time.deltaTime);
         transform.Rotate(rotate.x, rotate.y, rotate.z);
 
         if (Time.time >= rotationNextChangeTime)
@@ -106,22 +113,22 @@ public class RandomTransformer : MonoBehaviour
 
     void UpdateScale()
     {
-        Vector3 scaleChange = Vector3.one * (scaleCurrentDirection * scaleSpeed * Time.deltaTime);
+        Vector3 scaleChange = Vector3.one * (scaleCurrentDirection * _param.scaleSpeed * Time.deltaTime);
 
-        if (uniformScale)
+        if (_param.uniformScale)
         {
             transform.localScale += scaleChange;
             float scale = transform.localScale.x;
-            float minVal = minScale.x;
-            float maxVal = maxScale.x;
+            float minVal = _param.minScale.x;
+            float maxVal = _param.maxScale.x;
             scale = Mathf.Clamp(scale, minVal, maxVal);
             transform.localScale = Vector3.one * scale;
         }
         else
         {
             transform.localScale += scaleChange;
-            transform.localScale = Vector3.Min(transform.localScale, maxScale);
-            transform.localScale = Vector3.Max(transform.localScale, minScale);
+            transform.localScale = Vector3.Min(transform.localScale, _param.maxScale);
+            transform.localScale = Vector3.Max(transform.localScale, _param.minScale);
         }
 
         if (Time.time >= scaleNextChangeTime)
@@ -133,7 +140,7 @@ public class RandomTransformer : MonoBehaviour
     void UpdateRotationLerp()
     {
         rotationLerpTime += Time.deltaTime;
-        float t = Mathf.Clamp01(rotationLerpTime / lerpDuration);
+        float t = Mathf.Clamp01(rotationLerpTime / _param.lerpDuration);
         transform.rotation = Quaternion.Lerp(startRotation, targetRotation, t);
 
         if (t >= 1f)
@@ -145,7 +152,7 @@ public class RandomTransformer : MonoBehaviour
     void UpdateScaleLerp()
     {
         scaleLerpTime += Time.deltaTime;
-        float t = Mathf.Clamp01(scaleLerpTime / lerpDuration);
+        float t = Mathf.Clamp01(scaleLerpTime / _param.lerpDuration);
         transform.localScale = Vector3.Lerp(startScale, targetScale, t);
 
         if (t >= 1f)
@@ -157,22 +164,22 @@ public class RandomTransformer : MonoBehaviour
     void ScheduleNextRotation()
     {
         rotationCurrentDirection = Random.value < 0.5f ? -1f : 1f;
-        rotationNextChangeTime = Time.time + Random.Range(rotationIntervalMin, rotationIntervalMax);
+        rotationNextChangeTime = Time.time + Random.Range(_param.rotationIntervalMin, _param.rotationIntervalMax);
     }
 
     void ScheduleNextScale()
     {
         scaleCurrentDirection = Random.value < 0.5f ? -1f : 1f;
-        scaleNextChangeTime = Time.time + Random.Range(scaleIntervalMin, scaleIntervalMax);
+        scaleNextChangeTime = Time.time + Random.Range(_param.scaleIntervalMin, _param.scaleIntervalMax);
     }
 
     public void LerpToRandomScale()
     {
         startScale = transform.localScale;
         targetScale = new Vector3(
-            Random.Range(minScale.x, maxScale.x),
-            Random.Range(minScale.y, maxScale.y),
-            Random.Range(minScale.z, maxScale.z)
+            Random.Range(_param.minScale.x, _param.maxScale.x),
+            Random.Range(_param.minScale.y, _param.maxScale.y),
+            Random.Range(_param.minScale.z, _param.maxScale.z)
         );
         scaleLerpTime = 0f;
         isScaleLerping = true;

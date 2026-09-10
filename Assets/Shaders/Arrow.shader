@@ -11,6 +11,8 @@ Shader "Unlit/Arrow"
         _Count ("Count", Vector) = (1.5, 1.0, 0, 0)
         _MotionSpeed ("Motion Speed", Float) = 0.5
         _HeadAngle ("Head Angle", Float) = 90
+        _ColorA ("A Color", Color) = (1, 1, 1, 1)
+        _ColorB ("B Color", Color) = (0, 0, 0, 1)
     }
     SubShader
     {
@@ -49,6 +51,8 @@ Shader "Unlit/Arrow"
             float2 _Count;
             float _MotionSpeed;
             float _HeadAngle;
+            float4 _ColorA;
+            float4 _ColorB;
             
             #ifndef PI
             #define PI 3.1415926535897932384626433832795
@@ -180,7 +184,7 @@ Shader "Unlit/Arrow"
                 float aa = fwidth(d);
                 float mask = 1.0 - smoothstep(-aa, aa, d);
 
-                return mask;
+                return lerp(_ColorB, _ColorA, mask);
             }
             ENDCG
         }

@@ -27,6 +27,14 @@ public class PhysarumSimulationParam : ParmeterController<PhysarumSimulationPara
         TrailAndParticles
     }
 
+    public enum FieldMode
+    {
+        SeekBright,
+        SeekDark,
+        FollowContoursClockwise,
+        FollowContoursCounterClockwise
+    }
+
     [System.Serializable]
     public struct SignalCurve
     {
@@ -50,6 +58,15 @@ public class PhysarumSimulationParam : ParmeterController<PhysarumSimulationPara
     
     public Pattern selectedPattern = Pattern.OrganicVeins;
     public SpawnShape spawnShape = SpawnShape.Disc;
+
+    [Header("Field Map")]
+    public FieldMode fieldMode = FieldMode.SeekBright;
+    [Range(0f, 10f)] public float fieldStrength = 3f;
+    [Range(0.5f, 64f)] public float fieldGradientDistance = 4f;
+    [Range(0f, 180f)] public float fieldMaxTurnDegrees = 30f;
+    [Range(0.1f, 8f)] public float fieldContrast = 1f;
+    [Range(-1f, 1f)] public float fieldSpeedInfluence;
+    public bool flipFieldY;
     
     [Header("Simulation")]
     public Vector2Int resolution = new Vector2Int(1024, 1024);

@@ -13,6 +13,8 @@ struct Agent
 
 RWStructuredBuffer<Agent> _Agents;
 Texture2D<float> _TrailRead;
+Texture2D<float4> _FieldMap;
+SamplerState sampler_FieldMap;
 RWTexture2D<float> _TrailA;
 RWTexture2D<float> _TrailB;
 RWTexture2D<float> _TrailWrite;
@@ -38,6 +40,14 @@ float _SensedValueScale;
 int _BilinearSensing;
 float _TurnNoise;
 float _RespawnChance;
+int _HasFieldMap;
+int _FieldMode;
+float _FieldStrength;
+float _FieldGradientDistance;
+float _FieldMaxTurn;
+float _FieldContrast;
+float _FieldSpeedInfluence;
+int _FlipFieldY;
 
 float _Diffusion;
 float _Decay;
@@ -119,6 +129,19 @@ float SampleTrail(float2 position)
 float EvaluateCurve(float3 curve, float signal)
 {
     return curve.x + curve.y * pow(max(signal, 1e-6), max(curve.z, 0.01));
+}
+
+float SampleField(float2 uv)
+{
+    uv.y = lerp(uv.y, 1.0 - uv.y, (float)_FlipFieldY);
+    float3 sourceColor = _FieldMap.SampleLevel(sampler_FieldMap, saturate(uv), 0.0).rgb;
+    float luminance = dot(sourceColor, float3(0.2126, 0.7152, 0.0722));
+    return saturate((luminance - 0.5) * _FieldContrast + 0.5);
+}
+
+float2 RotateClockwise(float2 value)
+{
+    return float2(value.y, -value.x);
 }
 
 float2 SpawnPosition(uint agentIndex, uint salt)
@@ -220,8 +243,35 @@ void MoveAgents(uint agentIndex : SV_DispatchThreadID)
     float turnJitter = (Random01(iterationSeed ^ 0x1b56c4e9u) * 2.0 - 1.0) * _TurnNoise;
 
     agent.heading += turnDirection * rotationAngle + turnJitter;
+
+    float fieldValue = 0.5;
+    [branch]
+    if (_HasFieldMap != 0 && _FieldStrength > 0.0)
+    {
+        float2 fieldUv = (agent.position + 0.5) / max((float2)_Resolution, 1.0);
+        float2 fieldUvStep = _FieldGradientDistance / max((float2)_Resolution, 1.0);
+        float fieldLeft = SampleField(fieldUv - float2(fieldUvStep.x, 0.0));
+        float fieldRight = SampleField(fieldUv + float2(fieldUvStep.x, 0.0));
+        float fieldDown = SampleField(fieldUv - float2(0.0, fieldUvStep.y));
+        float fieldUp = SampleField(fieldUv + float2(0.0, fieldUvStep.y));
+        fieldValue = SampleField(fieldUv);
+        float2 fieldGradient = float2(fieldRight - fieldLeft, fieldUp - fieldDown);
+
+        fieldGradient = _FieldMode == 1 ? -fieldGradient : fieldGradient;
+        fieldGradient = _FieldMode == 2 ? RotateClockwise(fieldGradient) : fieldGradient;
+        fieldGradient = _FieldMode == 3 ? -RotateClockwise(fieldGradient) : fieldGradient;
+
+        float gradientMagnitude = length(fieldGradient);
+        float desiredFieldHeading = atan2(fieldGradient.y, fieldGradient.x);
+        float headingDifference = atan2(
+            sin(desiredFieldHeading - agent.heading),
+            cos(desiredFieldHeading - agent.heading));
+        float fieldWeight = saturate(gradientMagnitude * _FieldStrength);
+        agent.heading += clamp(headingDifference, -_FieldMaxTurn, _FieldMaxTurn) * fieldWeight;
+    }
     agent.heading -= floor(agent.heading / kTau) * kTau;
-    agent.position = WrapPosition(agent.position + HeadingDirection(agent.heading) * movementDistance);
+    float fieldSpeed = max(0.0, 1.0 + (fieldValue * 2.0 - 1.0) * _FieldSpeedInfluence * (float)_HasFieldMap);
+    agent.position = WrapPosition(agent.position + HeadingDirection(agent.heading) * movementDistance * fieldSpeed);
     agent.progress = frac(agent.progress + 0.0009765625);
     _Agents[agentIndex] = agent;
 
