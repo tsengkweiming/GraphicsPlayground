@@ -34,6 +34,7 @@ public class RandomGameObjectActivator : MonoBehaviour
     
     private readonly List<GameObject> _validObjects = new List<GameObject>();
     private readonly List<GameObject> _activeObjects = new List<GameObject>();
+    private readonly List<GameObject> _previousActiveObjects = new List<GameObject>();
     private readonly List<GameObject> _nextActiveObjects = new List<GameObject>();
     private readonly HashSet<GameObject> _nextActiveLookup = new HashSet<GameObject>();
     private readonly Dictionary<GameObject, Vector3> _originalScales = new Dictionary<GameObject, Vector3>();
@@ -41,17 +42,27 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private float _nextTriggerTime;
     private bool _hasAppliedSelection;
+    private bool _hasPreviousSelection;
+    private bool _isKeepingSelection;
     private bool _isTriggerScheduled;
+
+    public bool IsKeepingSelection => _isKeepingSelection;
 
     private void Start()
     {
+        if (_param == null)
+            return;
+
         SetRandomObjects();
         ScheduleNextTrigger();
     }
 
     private void Update()
     {
-        if (_param.intervalSeconds < 0f)
+        if (_param == null)
+            return;
+
+        if (_isKeepingSelection || _param.intervalSeconds < 0f)
         {
             _isTriggerScheduled = false;
             return;
@@ -77,8 +88,77 @@ public class RandomGameObjectActivator : MonoBehaviour
     /// </summary>
     public void SetRandomObjects()
     {
+        if (_param == null)
+            return;
+
         BuildValidObjectList();
         BuildNextSelection();
+
+        ApplyNextSelection(recordPreviousSelection: true);
+    }
+
+    /// <summary>
+    /// Toggles keeping the current selection. While enabled, automatic
+    /// retriggering is paused without changing the configured interval.
+    /// </summary>
+    public void KeepCurrentSelection()
+    {
+        if (_param == null)
+            return;
+
+        _isKeepingSelection = !_isKeepingSelection;
+        _isTriggerScheduled = false;
+
+        if (!_isKeepingSelection)
+            ScheduleNextTrigger();
+    }
+
+    /// <summary>
+    /// Immediately chooses and applies the next random selection.
+    /// </summary>
+    public void SelectNextRandomObjects()
+    {
+        if (_param == null)
+            return;
+
+        SetRandomObjects();
+        ScheduleNextTrigger();
+    }
+
+    /// <summary>
+    /// Restores the previous selection, if one has been recorded.
+    /// </summary>
+    public void SelectPreviousRandomObjects()
+    {
+        if (_param == null || !_hasPreviousSelection)
+            return;
+
+        BuildValidObjectList();
+        _nextActiveObjects.Clear();
+        _nextActiveLookup.Clear();
+
+        int selectionCount = Mathf.Clamp(_param.randomCount, 0, _previousActiveObjects.Count);
+        for (int i = 0; i < _previousActiveObjects.Count && _nextActiveObjects.Count < selectionCount; i++)
+        {
+            GameObject previousObject = _previousActiveObjects[i];
+            if (!previousObject || !_validObjects.Contains(previousObject) || !_nextActiveLookup.Add(previousObject))
+                continue;
+
+            _nextActiveObjects.Add(previousObject);
+        }
+
+        ApplyNextSelection(recordPreviousSelection: false);
+        ScheduleNextTrigger();
+    }
+
+    private void ApplyNextSelection(bool recordPreviousSelection)
+    {
+        if (recordPreviousSelection && _hasAppliedSelection)
+        {
+            _previousActiveObjects.Clear();
+            _previousActiveObjects.AddRange(_activeObjects);
+            _hasPreviousSelection = true;
+        }
 
         // On the first run, clear any objects that were already active in the
         // Inspector so the requested randomCount is respected immediately.
@@ -247,6 +327,9 @@ public class RandomGameObjectActivator : MonoBehaviour
 
     private void OnValidate()
     {
+        if (_param == null)
+            return;
+
         _param.randomCount = Mathf.Max(0, _param.randomCount);
         _param.activationDuration = Mathf.Max(0f, _param.activationDuration);
     }

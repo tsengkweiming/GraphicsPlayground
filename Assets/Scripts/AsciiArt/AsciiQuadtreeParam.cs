@@ -17,6 +17,7 @@ public class AsciiQuadtreeParam : ParmeterController<AsciiQuadtreeParam>
     public float lineWidth = 1.0f;
     [Range(0f, 1f)] public float lineStrength = 0f;
     public float phaseSpeed = 0.1f;
+    [Range(0f, 1f)] public float monoAsciiRatio = 0.5f;
     public float posterizeLevel = 5f;
     [Range(0.1f, 5)] public float gamma = 1f;
     [Range(0, 4)] public float contrast = 1.2f;
@@ -68,6 +69,7 @@ public class AsciiQuadtreeParam : ParmeterController<AsciiQuadtreeParam>
         lineWidth = other.lineWidth;
         lineStrength = other.lineStrength;
         phaseSpeed = other.phaseSpeed;
+        monoAsciiRatio = other.monoAsciiRatio;
         posterizeLevel = other.posterizeLevel;
         gamma = other.gamma;
         contrast = other.contrast;
@@ -115,6 +117,7 @@ public class AsciiQuadtreeParam : ParmeterController<AsciiQuadtreeParam>
         lineWidth = LerpValue(lineWidth, target.lineWidth, t);
         lineStrength = LerpValue(lineStrength, target.lineStrength, t);
         phaseSpeed = LerpValue(phaseSpeed, target.phaseSpeed, t);
+        monoAsciiRatio = LerpValue(monoAsciiRatio, target.monoAsciiRatio, t);
         posterizeLevel = LerpValue(posterizeLevel, target.posterizeLevel, t);
         gamma = LerpValue(gamma, target.gamma, t);
         contrast = LerpValue(contrast, target.contrast, t);
@@ -159,6 +162,7 @@ public class AsciiQuadtreeParam : ParmeterController<AsciiQuadtreeParam>
                && ApproximatelyValue(lineWidth, other.lineWidth)
                && ApproximatelyValue(lineStrength, other.lineStrength)
                && ApproximatelyValue(phaseSpeed, other.phaseSpeed)
+               && ApproximatelyValue(monoAsciiRatio, other.monoAsciiRatio)
                && ApproximatelyValue(posterizeLevel, other.posterizeLevel)
                && ApproximatelyValue(gamma, other.gamma)
                && ApproximatelyValue(contrast, other.contrast)

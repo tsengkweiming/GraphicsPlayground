@@ -11,6 +11,7 @@ public class AsciiArtController : ShaderController
     [Header("Shader Parameters")]
     [SerializeField] [Range(1, 300)] private float resolution = 60f;
     [SerializeField] [Range(2, 8)] private float posterizeLevels = 5f;
+    [SerializeField] [Range(0f, 1f)] private float monoAsciiRatio = 0.5f;
     [SerializeField] private Color backgroundColor = Color.white;
     [SerializeField] private bool flipY = false;
 
@@ -43,6 +44,8 @@ public class AsciiArtController : ShaderController
             shaderMaterial.SetFloat("_PosterizeLevels", posterizeLevels);
             lastPosterizeLevels = posterizeLevels;
         }
+
+        shaderMaterial.SetFloat("_MonoAsciiRatio", monoAsciiRatio);
 
         // Update background color
         shaderMaterial.SetColor("_BackgroundColor", backgroundColor);

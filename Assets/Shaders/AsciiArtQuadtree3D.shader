@@ -255,6 +255,7 @@ Shader "Hidden/ASCII Art Quadtree 3D"
 
             half3 SampleTexturePattern(float2 uv, int patternIndex)
             {
+                uv.y = 1 - uv.y;
                 half3 color = SAMPLE_TEXTURE2D(_Pattern9, sampler_Pattern9, uv).rgb;
                 if (patternIndex == 0) color = SAMPLE_TEXTURE2D(_Pattern0, sampler_Pattern0, uv).rgb;
                 else if (patternIndex == 1) color = SAMPLE_TEXTURE2D(_Pattern1, sampler_Pattern1, uv).rgb;

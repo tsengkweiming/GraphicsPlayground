@@ -57,6 +57,7 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
     private static readonly int LineWidthId = Shader.PropertyToID("_LineWidth");
     private static readonly int LineStrengthId = Shader.PropertyToID("_LineStrength");
     private static readonly int PhaseSpeedId = Shader.PropertyToID("_PhaseSpeed");
+    private static readonly int MonoAsciiRatioId = Shader.PropertyToID("_MonoAsciiRatio");
     private static readonly int ColorTexUvIndexId = Shader.PropertyToID("_ColorTexUvIndex");
     private static readonly int PosterizeLevelId = Shader.PropertyToID("_PosterizeLevel");
     private static readonly int GammaId = Shader.PropertyToID("_Gamma");
@@ -288,6 +289,7 @@ public sealed class AsciiArtQuadtree3DRenderer : ShaderController
         _properties.SetFloat(LineStrengthId, param.lineStrength);
         _properties.SetColor(LineColorId, param.lineColor);
         _properties.SetFloat(PhaseSpeedId, param.phaseSpeed);
+        _properties.SetFloat(MonoAsciiRatioId, param.monoAsciiRatio);
         _properties.SetFloat(ColorTexUvIndexId, param.colorTexUvIndex);
         _properties.SetFloat(PosterizeLevelId, param.posterizeLevel);
         _properties.SetFloat(GammaId, param.gamma);

@@ -20,6 +20,8 @@ public class AsciiArt3DParam
     [Min(0f)] public float depthMotionAmplitude = 0f;
     [Min(0f)] public float depthMotionSpeed = 1f;
     [Range(-180f, 180f)] public float rotationAmplitude = 0f;
+    public float phaseSpeed = 0.1f;
+    [Range(0f, 1f)] public float monoAsciiRatio = 0.5f;
     
     public Texture2D[] textures;
     public string textureBindName;
@@ -44,6 +46,8 @@ public sealed class AsciiArt3DRenderer : ShaderController
     private static readonly int DepthMotionAmplitudeId = Shader.PropertyToID("_DepthMotionAmplitude");
     private static readonly int DepthMotionSpeedId = Shader.PropertyToID("_DepthMotionSpeed");
     private static readonly int RotationAmplitudeId = Shader.PropertyToID("_RotationAmplitude");
+    private static readonly int PhaseSpeedId = Shader.PropertyToID("_PhaseSpeed");
+    private static readonly int MonoAsciiRatioId = Shader.PropertyToID("_MonoAsciiRatio");
 
     [Header("Rendering")]
     [SerializeField] private Mesh mesh;
@@ -194,6 +198,8 @@ public sealed class AsciiArt3DRenderer : ShaderController
         _properties.SetFloat(DepthMotionAmplitudeId, Mathf.Max(0f, param.depthMotionAmplitude));
         _properties.SetFloat(DepthMotionSpeedId, Mathf.Max(0f, param.depthMotionSpeed));
         _properties.SetFloat(RotationAmplitudeId, param.rotationAmplitude * Mathf.Deg2Rad);
+        _properties.SetFloat(PhaseSpeedId, Mathf.Max(0f, param.phaseSpeed));
+        _properties.SetFloat(MonoAsciiRatioId, param.monoAsciiRatio);
 
         for (var i = 0; i < param.textures.Length; i++)
         {

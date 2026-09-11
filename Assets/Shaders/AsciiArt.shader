@@ -45,6 +45,7 @@ Shader "Hidden/ASCII Art"
         _LineStrength ("Grid Line Strength", Range(0.0, 1.0)) = 1.0
         
         _PhaseSpeed ("Mono Phase Speed", Float) = 0.1
+        _MonoAsciiRatio ("Mono ASCII Time Ratio", Range(0.0, 1.0)) = 0.5
     }
 
     SubShader

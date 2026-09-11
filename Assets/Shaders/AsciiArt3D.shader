@@ -37,6 +37,7 @@ Shader "Hidden/ASCII Art 3D"
         _AmbientStrength ("Ambient Light Strength", Range(0, 2)) = 1
         _DirectLightStrength ("Direct Light Strength", Range(0, 2)) = 1
         _PhaseSpeed ("Mono Phase Speed", Float) = 0.1
+        _MonoAsciiRatio ("Mono ASCII Time Ratio", Range(0.0, 1.0)) = 0.5
         [Toggle] _FlipY ("Flip Y Axis", Float) = 0
 
         [HideInInspector] _GridColumns ("Grid Columns", Float) = 1

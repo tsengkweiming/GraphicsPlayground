@@ -29,7 +29,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _CanvasAspect: 6.58
+    - _CanvasAspect: 7
     - _PatternCount: 4
     - _SampleTex: 0
     - _Size: 0.3
